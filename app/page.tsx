@@ -1,7 +1,5 @@
+import CardStack from "./components/cardStack";
+
 export default function Home() {
-  return (
-    <main>
-      <div>Hello world!</div>
-    </main>
-  );
+  return <CardStack />;
 }
