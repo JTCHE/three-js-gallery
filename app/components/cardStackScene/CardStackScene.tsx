@@ -1,10 +1,9 @@
 import { OrthographicCamera } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import * as THREE from "three";
 import { images } from "../../lib/imgArray";
 import Card from "../Card/Card";
-import * as THREE from "three";
-import { cp } from "fs";
 
 export default function CardStackScene() {
   const imageCount = images.length;
@@ -13,6 +12,15 @@ export default function CardStackScene() {
 
   const [scrollPosition, setScrollPosition] = useState(0);
   const [stackOffset, setStackOffset] = useState(0);
+
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [hoveredTitle, setHoveredTitle] = useState<string | null>(null);
+  console.log("Hovered Title:", hoveredTitle);
+  const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  const { size, camera, gl, scene } = useThree();
+  const raycaster = useRef(new THREE.Raycaster());
+  const mouse = useRef(new THREE.Vector2());
 
   // Momentum scrolling state
   const velocity = useRef(0);
@@ -29,7 +37,14 @@ export default function CardStackScene() {
 
   // Generate infinite card positions
   const generateCards = () => {
-    const cards = [];
+    const cards: Array<{
+      index: number;
+      imageIndex: number;
+      imageUrl: string;
+      imageTitle: string;
+      baseZ: number;
+      isActive: boolean;
+    }> = [];
     const centerIndex = Math.round(scrollPosition);
 
     for (let i = centerIndex - renderDistance; i <= centerIndex + renderDistance; i++) {
@@ -40,13 +55,54 @@ export default function CardStackScene() {
         imageUrl: images[imageIndex].src,
         imageTitle: images[imageIndex].title,
         baseZ: i * spacing,
-        isActive: i === centerIndex,
+        isActive: hoveredIndex !== null ? i === hoveredIndex : i === centerIndex,
       });
     }
     return cards;
   };
 
   const cards = generateCards();
+
+  const handleMouseMove = useCallback(
+    (event) => {
+      if (isDragging.current) return; // Ignore hover if dragging
+
+      const rect = gl.domElement.getBoundingClientRect();
+      mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.current.setFromCamera(mouse.current, camera);
+
+      const cardMeshes: THREE.Mesh[] = [];
+      scene.traverse((child) => {
+        if (child.isMesh && child.userData && child.userData.cardIndex !== undefined) {
+          cardMeshes.push(child as THREE.Mesh);
+        }
+      });
+
+      const intersects = raycaster.current.intersectObjects(cardMeshes, false);
+
+      if (hoverTimeout.current) {
+        clearTimeout(hoverTimeout.current);
+        hoverTimeout.current = null;
+      }
+
+      if (intersects.length > 0) {
+        hoverTimeout.current = setTimeout(() => {
+          const cardIndex = intersects[0].object.userData.cardIndex;
+          const imageTitle = intersects[0].object.userData.imageTitle;
+          setHoveredIndex(cardIndex);
+          gl.domElement.style.cursor = "pointer";
+        }, 7);
+      } else {
+        hoverTimeout.current = setTimeout(() => {
+          setHoveredIndex(null);
+        }, 300);
+        gl.domElement.style.cursor = "grab";
+      }
+    },
+    [camera, gl, scene]
+  );
 
   // smooth stack movement with momentum
   useFrame((_, delta) => {
@@ -58,14 +114,16 @@ export default function CardStackScene() {
       isScrolling.current = true;
 
       // apply velocity to scroll position
-      // this currently works great on mobile to snap to the nearest card,
-      // but makes scrolling completely unusable on desktop
+      const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
       setScrollPosition((current) => {
         const next = current + velocity.current * delta * 60;
-        return Math.round(next);
+        if (isTouchDevice) {
+          return Math.round(next);
+        }
+        return next;
       });
       // adjust these values to control momentum behavior
-      const friction = 0.8; // Higher = less friction, more momentum
+      const friction = 0.75; // Higher = less friction, more momentum
       velocity.current *= friction;
 
       // stop momentum when velocity is very small
@@ -104,15 +162,20 @@ export default function CardStackScene() {
   );
 
   // Handle touch or mouse start
-  const handleTouchStart = useCallback((event) => {
+  const handleTouchStart = useCallback((event: MouseEvent | TouchEvent) => {
+    // Prevent link navigation if dragging
+    if (isDragging.current) {
+      event.preventDefault();
+      return;
+    }
     event.preventDefault();
     let clientY, clientX;
-    if (event.touches && event.touches.length > 0) {
+    if ("touches" in event && event.touches.length > 0) {
       clientY = event.touches[0].clientY;
       clientX = event.touches[0].clientX;
     } else {
-      clientY = event.clientY;
-      clientX = event.clientX;
+      clientY = (event as MouseEvent).clientY;
+      clientX = (event as MouseEvent).clientX;
     }
 
     touchStartY.current = clientY;
@@ -122,21 +185,22 @@ export default function CardStackScene() {
     velocity.current = 0; // Stop momentum when user starts dragging
     touchVelocity.current = 0;
     lastTouchTime.current = performance.now();
+    gl.domElement.style.cursor = "grabbing";
   }, []);
 
   // Handle touch or mouse move with velocity tracking
   const handleTouchMove = useCallback(
-    (event) => {
+    (event: TouchEvent | MouseEvent) => {
       event.preventDefault();
       if (!isDragging.current) return;
 
       let clientY, clientX;
-      if (event.touches && event.touches.length > 0) {
+      if ("touches" in event && event.touches.length > 0) {
         clientY = event.touches[0].clientY;
         clientX = event.touches[0].clientX;
       } else {
-        clientY = event.clientY;
-        clientX = event.clientX;
+        clientY = (event as MouseEvent).clientY;
+        clientX = (event as MouseEvent).clientX;
       }
 
       const currentTime = performance.now();
@@ -172,6 +236,7 @@ export default function CardStackScene() {
       // Clamp velocity
       velocity.current = Math.max(-3, Math.min(3, velocity.current));
     }
+    gl.domElement.style.cursor = "grab";
     isDragging.current = false;
   }, []);
 
@@ -186,6 +251,7 @@ export default function CardStackScene() {
       canvas.addEventListener("mousemove", handleTouchMove, { passive: false });
       canvas.addEventListener("mouseup", handleTouchEnd, { passive: false });
       canvas.addEventListener("mouseleave", handleTouchEnd, { passive: false });
+      canvas.addEventListener("mousemove", handleMouseMove, { passive: false });
       // Touch events for mobile
       canvas.addEventListener("touchstart", handleTouchStart, { passive: false });
       canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
@@ -197,38 +263,39 @@ export default function CardStackScene() {
         canvas.removeEventListener("mousemove", handleTouchMove);
         canvas.removeEventListener("mouseup", handleTouchEnd);
         canvas.removeEventListener("mouseleave", handleTouchEnd);
+        canvas.removeEventListener("mousemove", handleMouseMove);
         canvas.removeEventListener("touchstart", handleTouchStart);
         canvas.removeEventListener("touchmove", handleTouchMove);
         canvas.removeEventListener("touchend", handleTouchEnd);
       };
     }
-  }, [handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd]);
+  }, [handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd, handleMouseMove]);
 
-  const { size, camera } = useThree();
   const viewportAspect = size.width / size.height;
 
   useEffect(() => {
-    if (!camera || !camera.isOrthographicCamera) return;
+    if (!camera || !THREE.OrthographicCamera.prototype.isPrototypeOf(camera)) return;
 
+    const threeOrthographicCamera = camera as THREE.OrthographicCamera;
     const frustrumSize = 8;
     const isPortrait = viewportAspect <= 1;
     const isMobile = viewportAspect < 0.8;
     const portraitFactor = isMobile ? 0.3 : 0.45;
 
     if (isPortrait) {
-      camera.left = -frustrumSize * portraitFactor;
-      camera.right = frustrumSize * portraitFactor;
-      camera.top = (frustrumSize / viewportAspect) * portraitFactor;
-      camera.bottom = (-frustrumSize / viewportAspect) * portraitFactor;
+      threeOrthographicCamera.left = -frustrumSize * portraitFactor;
+      threeOrthographicCamera.right = frustrumSize * portraitFactor;
+      threeOrthographicCamera.top = (frustrumSize / viewportAspect) * portraitFactor;
+      threeOrthographicCamera.bottom = (-frustrumSize / viewportAspect) * portraitFactor;
     } else {
-      camera.left = (-frustrumSize * viewportAspect) / 2;
-      camera.right = (frustrumSize * viewportAspect) / 2;
-      camera.top = frustrumSize / 2;
-      camera.bottom = -frustrumSize / 2;
+      threeOrthographicCamera.left = (-frustrumSize * viewportAspect) / 2;
+      threeOrthographicCamera.right = (frustrumSize * viewportAspect) / 2;
+      threeOrthographicCamera.top = frustrumSize / 2;
+      threeOrthographicCamera.bottom = -frustrumSize / 2;
     }
 
-    camera.updateProjectionMatrix();
-    camera.lookAt(0, 0.5, 0);
+    threeOrthographicCamera.updateProjectionMatrix();
+    threeOrthographicCamera.lookAt(0, 0.5, 0);
   }, [size, viewportAspect, camera]);
 
   return (
@@ -243,7 +310,7 @@ export default function CardStackScene() {
         <Card
           key={`${card.index}-${card.imageUrl}`}
           zPosition={card.baseZ + stackOffset}
-          index={card.imageIndex}
+          index={card.index}
           isActive={card.isActive}
           imageUrl={card.imageUrl}
           imageTitle={card.imageTitle}
