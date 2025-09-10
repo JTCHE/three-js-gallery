@@ -24,4 +24,20 @@ export const images = [
     src: "https://images.unsplash.com/photo-1751517298153-9987060ba831",
     title: "waves",
   },
+  {
+    src: "https://images.unsplash.com/photo-1500534623283-312aade485b7",
+    title: "beach",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1468071174046-657d9d351a40",
+    title: "canyon",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1501785888041-af3ef285b470",
+    title: "lake",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1470770841072-f978cf4d019e",
+    title: "river",
+  },
 ];
