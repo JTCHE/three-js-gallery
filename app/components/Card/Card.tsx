@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useEffect } from "react";
 import { GradientMaskMaterial } from "./GradientShader";
 import * as THREE from "three";
+import { group } from "console";
 
 type CardProps = {
   zPosition: number;
@@ -11,11 +12,9 @@ type CardProps = {
   isActive: boolean;
   imageUrl: string;
   imageTitle: string;
-  onMouseEnter?: () => void;
-  onMouseLeave?: () => void;
 };
 
-export default function Card({ zPosition, index, isActive, imageUrl, imageTitle, onMouseEnter, onMouseLeave }: CardProps) {
+export default function Card({ zPosition, index, isActive, imageUrl, imageTitle }: CardProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [aspectRatio, setAspectRatio] = useState(1);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -51,8 +50,8 @@ export default function Card({ zPosition, index, isActive, imageUrl, imageTitle,
 
   const maxDimension = 3;
   const scaleFactor = Math.min(maxDimension / boxWidth, maxDimension / boxHeight);
-  const finalWidth = boxWidth * scaleFactor;
-  const finalHeight = boxHeight * scaleFactor;
+  const cardWidth = boxWidth * scaleFactor;
+  const cardHeight = boxHeight * scaleFactor;
 
   const router = useRouter();
 
@@ -60,9 +59,11 @@ export default function Card({ zPosition, index, isActive, imageUrl, imageTitle,
     <mesh
       ref={meshRef}
       position={[0, 0, 0]}
+      scale={[1.2, 1.2, 1]}
       onClick={() => router.push(`/index/${imageTitle}`)}
+      userData={{ cardIndex: index, imageTitle: imageTitle }}
     >
-      <boxGeometry args={[finalWidth, finalHeight, 0.035]} />
+      <boxGeometry args={[cardWidth, cardHeight, 0.035]} />
       <GradientMaskMaterial
         texture={texture}
         aspectRatio={aspectRatio}
