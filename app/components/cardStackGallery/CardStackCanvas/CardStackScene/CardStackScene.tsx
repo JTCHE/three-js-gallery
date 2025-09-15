@@ -1,30 +1,30 @@
+"use client";
 import { OrthographicCamera } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { images } from "../../lib/imgArray";
-import Card from "../Card/Card";
+import Card from "./Card/Card";
+import { StackImagesArray } from "@/app/lib/cardStackGallery/fetchStackImages";
 
-export default function CardStackScene() {
+export default function CardStackScene({ images }: { images: StackImagesArray }) {
   const imageCount = images.length;
   const spacing = 2.5;
   const renderDistance = 10;
 
   const [scrollPosition, setScrollPosition] = useState(0);
   const [stackOffset, setStackOffset] = useState(0);
-
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const [hoveredTitle, setHoveredTitle] = useState<string | null>(null);
-  console.log("Hovered Title:", hoveredTitle);
-  const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
 
+  const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
   const { size, camera, gl, scene } = useThree();
   const raycaster = useRef(new THREE.Raycaster());
   const mouse = useRef(new THREE.Vector2());
 
+  // Cache card meshes to avoid scene traversal
+  const cardMeshes = useRef<THREE.Mesh[]>([]);
+
   // Momentum scrolling state
   const velocity = useRef(0);
-  const lastTime = useRef(0);
   const isScrolling = useRef(false);
 
   // Touch handling state
@@ -35,9 +35,10 @@ export default function CardStackScene() {
   const touchVelocity = useRef(0);
   const lastTouchTime = useRef(0);
 
-  // Generate infinite card positions
-  const generateCards = () => {
-    const cards: Array<{
+  // Memoize card generation - only regenerate when scroll position or hovered index changes
+  const cards = useMemo(() => {
+    const centerIndex = Math.round(scrollPosition);
+    const cardData: Array<{
       index: number;
       imageIndex: number;
       imageUrl: string;
@@ -45,11 +46,10 @@ export default function CardStackScene() {
       baseZ: number;
       isActive: boolean;
     }> = [];
-    const centerIndex = Math.round(scrollPosition);
 
     for (let i = centerIndex - renderDistance; i <= centerIndex + renderDistance; i++) {
-      const imageIndex = ((i % imageCount) + imageCount) % imageCount; // wrap around
-      cards.push({
+      const imageIndex = ((i % imageCount) + imageCount) % imageCount;
+      cardData.push({
         index: i,
         imageIndex: imageIndex,
         imageUrl: images[imageIndex].src,
@@ -58,14 +58,13 @@ export default function CardStackScene() {
         isActive: hoveredIndex !== null ? i === hoveredIndex : i === centerIndex,
       });
     }
-    return cards;
-  };
+    return cardData;
+  }, [Math.round(scrollPosition), hoveredIndex, hoverTimeout, imageCount, images, renderDistance, spacing, camera]);
 
-  const cards = generateCards();
-
+  // Optimized mouse move handler with cached meshes
   const handleMouseMove = useCallback(
     (event) => {
-      if (isDragging.current) return; // Ignore hover if dragging
+      if (isDragging.current) return;
 
       const rect = gl.domElement.getBoundingClientRect();
       mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -73,14 +72,17 @@ export default function CardStackScene() {
 
       raycaster.current.setFromCamera(mouse.current, camera);
 
-      const cardMeshes: THREE.Mesh[] = [];
-      scene.traverse((child) => {
-        if (child.isMesh && child.userData && child.userData.cardIndex !== undefined) {
-          cardMeshes.push(child as THREE.Mesh);
-        }
-      });
+      // Use cached meshes instead of traversing scene
+      if (cardMeshes.current.length === 0) {
+        // Only traverse once to build cache
+        scene.traverse((child) => {
+          if (child.isMesh && child.userData && child.userData.cardIndex !== undefined) {
+            cardMeshes.current.push(child as THREE.Mesh);
+          }
+        });
+      }
 
-      const intersects = raycaster.current.intersectObjects(cardMeshes, false);
+      const intersects = raycaster.current.intersectObjects(cardMeshes.current, false);
 
       if (hoverTimeout.current) {
         clearTimeout(hoverTimeout.current);
@@ -90,7 +92,6 @@ export default function CardStackScene() {
       if (intersects.length > 0) {
         hoverTimeout.current = setTimeout(() => {
           const cardIndex = intersects[0].object.userData.cardIndex;
-          const imageTitle = intersects[0].object.userData.imageTitle;
           setHoveredIndex(cardIndex);
           gl.domElement.style.cursor = "pointer";
         }, 7);
@@ -104,16 +105,30 @@ export default function CardStackScene() {
     [camera, gl, scene]
   );
 
-  // smooth stack movement with momentum
+  // Throttled mouse move to reduce frequency
+  const throttledMouseMove = useCallback(
+    (() => {
+      let timeoutId: NodeJS.Timeout | null = null;
+      return (event: MouseEvent) => {
+        if (timeoutId) return;
+        timeoutId = setTimeout(() => {
+          handleMouseMove(event);
+          timeoutId = null;
+        }, 16); // ~60fps
+      };
+    })(),
+    [handleMouseMove]
+  );
+
+  // Smooth stack movement with momentum
   useFrame((_, delta) => {
     const targetOffset = -scrollPosition * spacing;
     setStackOffset((current) => THREE.MathUtils.lerp(current, targetOffset, 0.1));
 
-    // apply momentum scrolling
+    // Apply momentum scrolling
     if (!isDragging.current && Math.abs(velocity.current) > 0.001) {
       isScrolling.current = true;
 
-      // apply velocity to scroll position
       const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
       setScrollPosition((current) => {
         const next = current + velocity.current * delta * 60;
@@ -122,11 +137,10 @@ export default function CardStackScene() {
         }
         return next;
       });
-      // adjust these values to control momentum behavior
-      const friction = 0.75; // Higher = less friction, more momentum
+
+      const friction = isTouchDevice ? 0.2 : 0.7;
       velocity.current *= friction;
 
-      // stop momentum when velocity is very small
       if (Math.abs(velocity.current) < 0.001) {
         velocity.current = 0;
         isScrolling.current = false;
@@ -137,14 +151,11 @@ export default function CardStackScene() {
   // Handle momentum-based scrolling
   const handleScroll = useCallback((delta, addVelocity = false) => {
     if (addVelocity) {
-      // Add to existing velocity for momentum
-      velocity.current += delta * 0.3; // Adjust multiplier for sensitivity
-      // Clamp velocity to prevent excessive speeds
+      velocity.current += delta * 0.3;
       velocity.current = Math.max(-2, Math.min(2, velocity.current));
     } else {
-      // Direct scroll (for wheel events)
       setScrollPosition((current) => current + delta);
-      velocity.current = 0; // Reset momentum on direct scroll
+      velocity.current = 0;
     }
   }, []);
 
@@ -152,23 +163,22 @@ export default function CardStackScene() {
   const handleWheel = useCallback(
     (event) => {
       event.preventDefault();
-      // Clamp wheel delta to max speed
       const rawDelta = event.deltaY > 0 ? -0.5 : 0.5;
       const maxWheelSpeed = 0.5;
       const delta = Math.max(-maxWheelSpeed, Math.min(maxWheelSpeed, rawDelta));
-      handleScroll(delta, true); // Enable momentum for wheel events
+      handleScroll(delta, true);
     },
     [handleScroll]
   );
 
   // Handle touch or mouse start
   const handleTouchStart = useCallback((event: MouseEvent | TouchEvent) => {
-    // Prevent link navigation if dragging
     if (isDragging.current) {
       event.preventDefault();
       return;
     }
     event.preventDefault();
+
     let clientY, clientX;
     if ("touches" in event && event.touches.length > 0) {
       clientY = event.touches[0].clientY;
@@ -182,7 +192,7 @@ export default function CardStackScene() {
     touchStartX.current = clientX;
     lastTouchY.current = clientY;
     isDragging.current = true;
-    velocity.current = 0; // Stop momentum when user starts dragging
+    velocity.current = 0;
     touchVelocity.current = 0;
     lastTouchTime.current = performance.now();
     gl.domElement.style.cursor = "grabbing";
@@ -207,18 +217,16 @@ export default function CardStackScene() {
       const deltaTime = currentTime - lastTouchTime.current;
       const deltaY = clientY - lastTouchY.current;
 
-      // Calculate velocity for momentum
       if (deltaTime > 0) {
-        touchVelocity.current = (-deltaY / deltaTime) * 16; // Convert to 60fps equivalent, reversed
+        touchVelocity.current = (-deltaY / deltaTime) * 16;
       }
 
-      // Only handle vertical swipes
       const totalDeltaY = clientY - touchStartY.current;
       const totalDeltaX = clientX - touchStartX.current;
 
       if (Math.abs(totalDeltaY) > Math.abs(totalDeltaX) && Math.abs(deltaY) > 2) {
-        const scrollDelta = -deltaY * 0.01; // Adjust sensitivity, reversed
-        handleScroll(scrollDelta, false); // Direct scroll during drag
+        const scrollDelta = -deltaY * 0.01;
+        handleScroll(scrollDelta, false);
       }
 
       lastTouchY.current = clientY;
@@ -231,28 +239,28 @@ export default function CardStackScene() {
   const handleTouchEnd = useCallback((event) => {
     event.preventDefault();
     if (isDragging.current) {
-      // Apply momentum based on touch velocity
-      velocity.current = touchVelocity.current * 0.1; // Adjust momentum strength
-      // Clamp velocity
+      velocity.current = touchVelocity.current * 0.1;
       velocity.current = Math.max(-3, Math.min(3, velocity.current));
     }
     gl.domElement.style.cursor = "grab";
     isDragging.current = false;
   }, []);
 
+  // Reset mesh cache when cards change (scroll or hover)
+  useEffect(() => {
+    cardMeshes.current = [];
+  }, [scrollPosition, hoveredIndex]);
+
   // Set up event listeners
   useEffect(() => {
     const canvas = document.querySelector("canvas");
     if (canvas) {
-      // Mouse wheel events
       canvas.addEventListener("wheel", handleWheel, { passive: false });
-      // Mouse drag events
       canvas.addEventListener("mousedown", handleTouchStart, { passive: false });
       canvas.addEventListener("mousemove", handleTouchMove, { passive: false });
       canvas.addEventListener("mouseup", handleTouchEnd, { passive: false });
       canvas.addEventListener("mouseleave", handleTouchEnd, { passive: false });
-      canvas.addEventListener("mousemove", handleMouseMove, { passive: false });
-      // Touch events for mobile
+      canvas.addEventListener("mousemove", throttledMouseMove, { passive: false });
       canvas.addEventListener("touchstart", handleTouchStart, { passive: false });
       canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
       canvas.addEventListener("touchend", handleTouchEnd, { passive: false });
@@ -263,13 +271,13 @@ export default function CardStackScene() {
         canvas.removeEventListener("mousemove", handleTouchMove);
         canvas.removeEventListener("mouseup", handleTouchEnd);
         canvas.removeEventListener("mouseleave", handleTouchEnd);
-        canvas.removeEventListener("mousemove", handleMouseMove);
+        canvas.removeEventListener("mousemove", throttledMouseMove);
         canvas.removeEventListener("touchstart", handleTouchStart);
         canvas.removeEventListener("touchmove", handleTouchMove);
         canvas.removeEventListener("touchend", handleTouchEnd);
       };
     }
-  }, [handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd, handleMouseMove]);
+  }, [handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd, throttledMouseMove]);
 
   const viewportAspect = size.width / size.height;
 
@@ -277,7 +285,7 @@ export default function CardStackScene() {
     if (!camera || !THREE.OrthographicCamera.prototype.isPrototypeOf(camera)) return;
 
     const threeOrthographicCamera = camera as THREE.OrthographicCamera;
-    const frustrumSize = 8;
+    const frustrumSize = 6;
     const isPortrait = viewportAspect <= 1;
     const isMobile = viewportAspect < 0.8;
     const portraitFactor = isMobile ? 0.3 : 0.45;
@@ -308,7 +316,7 @@ export default function CardStackScene() {
 
       {cards.map((card) => (
         <Card
-          key={`${card.index}-${card.imageUrl}`}
+          key={card.index}
           zPosition={card.baseZ + stackOffset}
           index={card.index}
           isActive={card.isActive}
@@ -317,7 +325,6 @@ export default function CardStackScene() {
         />
       ))}
 
-      {/* Subtle ambient lighting */}
       <ambientLight intensity={0.8} />
       <directionalLight
         position={[5, 5, 5]}

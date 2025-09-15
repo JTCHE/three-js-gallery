@@ -1,10 +1,9 @@
 "use client";
-import { useLoader, useFrame } from "@react-three/fiber";
+import { useFrame, useLoader } from "@react-three/fiber";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useEffect } from "react";
-import { GradientMaskMaterial } from "./GradientShader";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { group } from "console";
+import { GradientMaskMaterial } from "./GradientShader";
 
 type CardProps = {
   zPosition: number;
