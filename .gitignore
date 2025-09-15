@@ -41,4 +41,4 @@ yarn-error.log*
 next-env.d.ts
 
 # local images
-/app/public/*
+/app/public/img/index/*
