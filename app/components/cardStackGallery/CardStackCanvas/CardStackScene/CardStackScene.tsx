@@ -279,6 +279,14 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
     }
   }, [handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd, throttledMouseMove]);
 
+  // Push active card title to context
+  useEffect(() => {
+    const activeCard = cards.find((card) => card.isActive);
+    if (activeCard) {
+      console.log(activeCard.imageTitle);
+    }
+  }, [cards, scrollPosition]);
+
   const viewportAspect = size.width / size.height;
 
   useEffect(() => {
