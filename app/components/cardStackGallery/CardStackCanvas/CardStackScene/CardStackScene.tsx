@@ -3,8 +3,12 @@ import { OrthographicCamera } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import Card from "./Card/Card";
+import Card, { CardProps } from "./Card/Card";
 import { StackImagesArray } from "@/app/lib/cardStackGallery/fetchStackImages";
+import findActiveCard from "@/app/lib/cardStackGallery/findActiveCard";
+import useResponsiveCamera from "@/app/lib/cardStackGallery/hooks/camera/useResponsiveCamera";
+import useInitEventListeners from "@/app/lib/cardStackGallery/hooks/gestures/useInitEventListeners";
+import useTouchEnd from "@/app/lib/cardStackGallery/hooks/gestures/touch/useTouchEnd";
 
 export default function CardStackScene({ images }: { images: StackImagesArray }) {
   const imageCount = images.length;
@@ -38,24 +42,18 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
   // Memoize card generation - only regenerate when scroll position or hovered index changes
   const cards = useMemo(() => {
     const centerIndex = Math.round(scrollPosition);
-    const cardData: Array<{
-      index: number;
-      imageIndex: number;
-      imageUrl: string;
-      imageTitle: string;
-      baseZ: number;
-      isActive: boolean;
-    }> = [];
+    const cardData: Array<CardProps> = [];
 
     for (let i = centerIndex - renderDistance; i <= centerIndex + renderDistance; i++) {
       const imageIndex = ((i % imageCount) + imageCount) % imageCount;
       cardData.push({
-        index: i,
-        imageIndex: imageIndex,
+        cardIndex: i,
+        // cardIndex: imageIndex,
         imageUrl: images[imageIndex].src,
-        imageTitle: images[imageIndex].title,
-        baseZ: i * spacing,
+        cardTitle: images[imageIndex].title,
+        zPosition: i * spacing,
         isActive: hoveredIndex !== null ? i === hoveredIndex : i === centerIndex,
+        cardOwner: images[imageIndex].owner,
       });
     }
     return cardData;
@@ -63,7 +61,7 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
 
   // Optimized mouse move handler with cached meshes
   const handleMouseMove = useCallback(
-    (event) => {
+    (event : MouseEvent) => {
       if (isDragging.current) return;
 
       const rect = gl.domElement.getBoundingClientRect();
@@ -75,8 +73,8 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
       // Use cached meshes instead of traversing scene
       if (cardMeshes.current.length === 0) {
         // Only traverse once to build cache
-        scene.traverse((child) => {
-          if (child.isMesh && child.userData && child.userData.cardIndex !== undefined) {
+        scene.traverse((child: THREE.Object3D) => {
+          if (child instanceof THREE.Mesh && child.userData && child.userData.cardIndex !== undefined) {
             cardMeshes.current.push(child as THREE.Mesh);
           }
         });
@@ -236,15 +234,7 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
   );
 
   // Handle touch or mouse end with momentum application
-  const handleTouchEnd = useCallback((event) => {
-    event.preventDefault();
-    if (isDragging.current) {
-      velocity.current = touchVelocity.current * 0.1;
-      velocity.current = Math.max(-3, Math.min(3, velocity.current));
-    }
-    gl.domElement.style.cursor = "grab";
-    isDragging.current = false;
-  }, []);
+  const handleTouchEnd = useTouchEnd(isDragging, touchVelocity, velocity, gl);
 
   // Reset mesh cache when cards change (scroll or hover)
   useEffect(() => {
@@ -252,67 +242,15 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
   }, [scrollPosition, hoveredIndex]);
 
   // Set up event listeners
-  useEffect(() => {
-    const canvas = document.querySelector("canvas");
-    if (canvas) {
-      canvas.addEventListener("wheel", handleWheel, { passive: false });
-      canvas.addEventListener("mousedown", handleTouchStart, { passive: false });
-      canvas.addEventListener("mousemove", handleTouchMove, { passive: false });
-      canvas.addEventListener("mouseup", handleTouchEnd, { passive: false });
-      canvas.addEventListener("mouseleave", handleTouchEnd, { passive: false });
-      canvas.addEventListener("mousemove", throttledMouseMove, { passive: false });
-      canvas.addEventListener("touchstart", handleTouchStart, { passive: false });
-      canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
-      canvas.addEventListener("touchend", handleTouchEnd, { passive: false });
-
-      return () => {
-        canvas.removeEventListener("wheel", handleWheel);
-        canvas.removeEventListener("mousedown", handleTouchStart);
-        canvas.removeEventListener("mousemove", handleTouchMove);
-        canvas.removeEventListener("mouseup", handleTouchEnd);
-        canvas.removeEventListener("mouseleave", handleTouchEnd);
-        canvas.removeEventListener("mousemove", throttledMouseMove);
-        canvas.removeEventListener("touchstart", handleTouchStart);
-        canvas.removeEventListener("touchmove", handleTouchMove);
-        canvas.removeEventListener("touchend", handleTouchEnd);
-      };
-    }
-  }, [handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd, throttledMouseMove]);
+  useInitEventListeners(handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd, throttledMouseMove);
 
   // Push active card title to context
   useEffect(() => {
-    const activeCard = cards.find((card) => card.isActive);
-    if (activeCard) {
-      console.log(activeCard.imageTitle);
-    }
+    console.log(findActiveCard(cards)?.cardOwner);
   }, [cards, scrollPosition]);
 
-  const viewportAspect = size.width / size.height;
-
-  useEffect(() => {
-    if (!camera || !THREE.OrthographicCamera.prototype.isPrototypeOf(camera)) return;
-
-    const threeOrthographicCamera = camera as THREE.OrthographicCamera;
-    const frustrumSize = 6;
-    const isPortrait = viewportAspect <= 1;
-    const isMobile = viewportAspect < 0.8;
-    const portraitFactor = isMobile ? 0.3 : 0.45;
-
-    if (isPortrait) {
-      threeOrthographicCamera.left = -frustrumSize * portraitFactor;
-      threeOrthographicCamera.right = frustrumSize * portraitFactor;
-      threeOrthographicCamera.top = (frustrumSize / viewportAspect) * portraitFactor;
-      threeOrthographicCamera.bottom = (-frustrumSize / viewportAspect) * portraitFactor;
-    } else {
-      threeOrthographicCamera.left = (-frustrumSize * viewportAspect) / 2;
-      threeOrthographicCamera.right = (frustrumSize * viewportAspect) / 2;
-      threeOrthographicCamera.top = frustrumSize / 2;
-      threeOrthographicCamera.bottom = -frustrumSize / 2;
-    }
-
-    threeOrthographicCamera.updateProjectionMatrix();
-    threeOrthographicCamera.lookAt(0, 0.5, 0);
-  }, [size, viewportAspect, camera]);
+  // Responsive camera adjustment
+  useResponsiveCamera(camera, size);
 
   return (
     <>
@@ -324,12 +262,13 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
 
       {cards.map((card) => (
         <Card
-          key={card.index}
-          zPosition={card.baseZ + stackOffset}
-          index={card.index}
+          key={card.cardIndex}
+          zPosition={card.zPosition + stackOffset}
+          cardIndex={card.cardIndex}
           isActive={card.isActive}
           imageUrl={card.imageUrl}
-          imageTitle={card.imageTitle}
+          cardTitle={card.cardTitle}
+          cardOwner={card.cardOwner}
         />
       ))}
 
