@@ -5,15 +5,16 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GradientMaskMaterial } from "./GradientShader";
 
-type CardProps = {
+export type CardProps = {
   zPosition: number;
-  index: number;
+  cardIndex: number;
   isActive: boolean;
   imageUrl: string;
-  imageTitle: string;
+  cardTitle: string;
+  cardOwner: string;
 };
 
-export default function Card({ zPosition, index, isActive, imageUrl, imageTitle }: CardProps) {
+export default function Card({ zPosition, cardIndex, isActive, imageUrl, cardTitle, cardOwner, baseZ }: CardProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [aspectRatio, setAspectRatio] = useState(1);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -59,8 +60,8 @@ export default function Card({ zPosition, index, isActive, imageUrl, imageTitle 
       ref={meshRef}
       position={[0, 0, 0]}
       scale={[1.2, 1.2, 1]}
-      onClick={() => router.push(`/index/${imageTitle}`)}
-      userData={{ cardIndex: index, imageTitle: imageTitle }}
+      onClick={() => router.push(`/cardIndex/${cardTitle}`)}
+      userData={{ cardIndex: cardIndex, cardTitle: cardTitle }}
     >
       <boxGeometry args={[cardWidth, cardHeight, 0.035]} />
       <GradientMaskMaterial
