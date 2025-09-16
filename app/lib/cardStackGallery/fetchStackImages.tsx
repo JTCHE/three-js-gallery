@@ -1,4 +1,8 @@
-export type StackImagesArray = { src: string; title: string }[];
+export type StackImagesArray = {
+  src: string;
+  title: string;
+  owner: string;
+}[];
 
 // Cache the results
 let cachedImages: StackImagesArray | null = null;
@@ -15,7 +19,7 @@ function shuffleArray<T>(array: T[]): T[] {
 
 // fetchStackImages function that pulls from strapi api (STRAPI_BASE_URL and STRAPI_API_KEY env vars must be set) from the gallery-images collection type. fetch all images and console log and return the array
 export default async function fetchStackImages(): Promise<StackImagesArray> {
-  if (cachedImages) return shuffleArray(cachedImages);
+  // if (cachedImages) return shuffleArray(cachedImages);
 
   const STRAPI_BASE_URL = process.env.STRAPI_BASE_URL;
   const STRAPI_API_KEY = process.env.STRAPI_API_KEY;
@@ -38,10 +42,26 @@ export default async function fetchStackImages(): Promise<StackImagesArray> {
   const data = await res.json();
 
   cachedImages = Array.isArray(data.data)
-    ? data.data.map((item: any) => ({
-        src: item.Media?.url ?? "",
-        title: item.title,
-      }))
+    ? data.data
+        .map((item: any) => {
+          const src = item.Media?.url ?? "";
+          const owner =
+            item.OwnershipType === "project"
+              ? item.project_ownership?.title
+              : item.OwnershipType === "article"
+              ? item.article_ownership?.title
+              : "";
+          const title = item.title;
+          if (!src || !owner || !title) {
+            return null;
+          }
+          return {
+            src,
+            title,
+            owner,
+          };
+        })
+        .filter((img: any) => img !== null)
     : [];
 
   return shuffleArray(cachedImages ?? []);
