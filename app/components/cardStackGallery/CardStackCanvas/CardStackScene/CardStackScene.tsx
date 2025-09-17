@@ -9,8 +9,16 @@ import findActiveCard from "@/app/lib/cardStackGallery/findActiveCard";
 import useResponsiveCamera from "@/app/lib/cardStackGallery/hooks/camera/useResponsiveCamera";
 import useInitEventListeners from "@/app/lib/cardStackGallery/hooks/gestures/useInitEventListeners";
 import useTouchEnd from "@/app/lib/cardStackGallery/hooks/gestures/touch/useTouchEnd";
+import useTouchMove from "@/app/lib/cardStackGallery/hooks/gestures/touch/useTouchMove";
+import useHandleWheel from "@/app/lib/cardStackGallery/hooks/gestures/scroll/useHandleWheel";
+import useTouchStart from "@/app/lib/cardStackGallery/hooks/gestures/touch/useTouchStart";
+import useMouseHover from "@/app/lib/cardStackGallery/hooks/gestures/hover/useMouseHover";
+import useMemoizeCards from "@/app/lib/cardStackGallery/hooks/utils/useMemoizeCards";
+import { useRouter } from "next/navigation";
 
 export default function CardStackScene({ images }: { images: StackImagesArray }) {
+  const router = useRouter();
+
   const imageCount = images.length;
   const spacing = 2.5;
   const renderDistance = 10;
@@ -26,6 +34,10 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
 
   // Cache card meshes to avoid scene traversal
   const cardMeshes = useRef<THREE.Mesh[]>([]);
+  // Reset mesh cache when cards change (scroll or hover)
+  useEffect(() => {
+    cardMeshes.current = [];
+  }, [scrollPosition, hoveredIndex]);
 
   // Momentum scrolling state
   const velocity = useRef(0);
@@ -40,70 +52,31 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
   const lastTouchTime = useRef(0);
 
   // Memoize card generation - only regenerate when scroll position or hovered index changes
-  const cards = useMemo(() => {
-    const centerIndex = Math.round(scrollPosition);
-    const cardData: Array<CardProps> = [];
-
-    for (let i = centerIndex - renderDistance; i <= centerIndex + renderDistance; i++) {
-      const imageIndex = ((i % imageCount) + imageCount) % imageCount;
-      cardData.push({
-        cardIndex: i,
-        // cardIndex: imageIndex,
-        imageUrl: images[imageIndex].src,
-        cardTitle: images[imageIndex].title,
-        zPosition: i * spacing,
-        isActive: hoveredIndex !== null ? i === hoveredIndex : i === centerIndex,
-        cardOwner: images[imageIndex].owner,
-      });
-    }
-    return cardData;
-  }, [Math.round(scrollPosition), hoveredIndex, hoverTimeout, imageCount, images, renderDistance, spacing, camera]);
+  const cards = useMemoizeCards({
+    scrollPosition,
+    hoveredIndex,
+    hoverTimeout,
+    imageCount,
+    images,
+    renderDistance,
+    spacing,
+    camera,
+  });
 
   // Optimized mouse move handler with cached meshes
-  const handleMouseMove = useCallback(
-    (event : MouseEvent) => {
-      if (isDragging.current) return;
-
-      const rect = gl.domElement.getBoundingClientRect();
-      mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-      raycaster.current.setFromCamera(mouse.current, camera);
-
-      // Use cached meshes instead of traversing scene
-      if (cardMeshes.current.length === 0) {
-        // Only traverse once to build cache
-        scene.traverse((child: THREE.Object3D) => {
-          if (child instanceof THREE.Mesh && child.userData && child.userData.cardIndex !== undefined) {
-            cardMeshes.current.push(child as THREE.Mesh);
-          }
-        });
-      }
-
-      const intersects = raycaster.current.intersectObjects(cardMeshes.current, false);
-
-      if (hoverTimeout.current) {
-        clearTimeout(hoverTimeout.current);
-        hoverTimeout.current = null;
-      }
-
-      if (intersects.length > 0) {
-        hoverTimeout.current = setTimeout(() => {
-          const cardIndex = intersects[0].object.userData.cardIndex;
-          setHoveredIndex(cardIndex);
-          gl.domElement.style.cursor = "pointer";
-        }, 7);
-      } else {
-        hoverTimeout.current = setTimeout(() => {
-          setHoveredIndex(null);
-        }, 300);
-        gl.domElement.style.cursor = "grab";
-      }
-    },
-    [camera, gl, scene]
+  const handleMouseMove = useMouseHover(
+    isDragging,
+    raycaster,
+    mouse,
+    camera,
+    scene,
+    gl,
+    setHoveredIndex,
+    cardMeshes,
+    hoverTimeout
   );
 
-  // Throttled mouse move to reduce frequency
+  // Throttled mouse move to prevent flickering on hover
   const throttledMouseMove = useCallback(
     (() => {
       let timeoutId: NodeJS.Timeout | null = null;
@@ -146,111 +119,59 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
     }
   });
 
-  // Handle momentum-based scrolling
-  const handleScroll = useCallback((delta, addVelocity = false) => {
-    if (addVelocity) {
-      velocity.current += delta * 0.3;
-      velocity.current = Math.max(-2, Math.min(2, velocity.current));
-    } else {
-      setScrollPosition((current) => current + delta);
-      velocity.current = 0;
-    }
-  }, []);
-
   // Handle mouse wheel with momentum
-  const handleWheel = useCallback(
-    (event) => {
-      event.preventDefault();
-      const rawDelta = event.deltaY > 0 ? -0.5 : 0.5;
-      const maxWheelSpeed = 0.5;
-      const delta = Math.max(-maxWheelSpeed, Math.min(maxWheelSpeed, rawDelta));
-      handleScroll(delta, true);
-    },
-    [handleScroll]
-  );
+  const handleWheel = useHandleWheel(velocity, setScrollPosition);
 
   // Handle touch or mouse start
-  const handleTouchStart = useCallback((event: MouseEvent | TouchEvent) => {
-    if (isDragging.current) {
-      event.preventDefault();
-      return;
-    }
-    event.preventDefault();
-
-    let clientY, clientX;
-    if ("touches" in event && event.touches.length > 0) {
-      clientY = event.touches[0].clientY;
-      clientX = event.touches[0].clientX;
-    } else {
-      clientY = (event as MouseEvent).clientY;
-      clientX = (event as MouseEvent).clientX;
-    }
-
-    touchStartY.current = clientY;
-    touchStartX.current = clientX;
-    lastTouchY.current = clientY;
-    isDragging.current = true;
-    velocity.current = 0;
-    touchVelocity.current = 0;
-    lastTouchTime.current = performance.now();
-    gl.domElement.style.cursor = "grabbing";
-  }, []);
+  const handleTouchStart = useTouchStart(
+    touchStartY,
+    touchStartX,
+    lastTouchY,
+    isDragging,
+    velocity,
+    touchVelocity,
+    lastTouchTime,
+    gl
+  );
 
   // Handle touch or mouse move with velocity tracking
-  const handleTouchMove = useCallback(
-    (event: TouchEvent | MouseEvent) => {
-      event.preventDefault();
-      if (!isDragging.current) return;
-
-      let clientY, clientX;
-      if ("touches" in event && event.touches.length > 0) {
-        clientY = event.touches[0].clientY;
-        clientX = event.touches[0].clientX;
-      } else {
-        clientY = (event as MouseEvent).clientY;
-        clientX = (event as MouseEvent).clientX;
-      }
-
-      const currentTime = performance.now();
-      const deltaTime = currentTime - lastTouchTime.current;
-      const deltaY = clientY - lastTouchY.current;
-
-      if (deltaTime > 0) {
-        touchVelocity.current = (-deltaY / deltaTime) * 16;
-      }
-
-      const totalDeltaY = clientY - touchStartY.current;
-      const totalDeltaX = clientX - touchStartX.current;
-
-      if (Math.abs(totalDeltaY) > Math.abs(totalDeltaX) && Math.abs(deltaY) > 2) {
-        const scrollDelta = -deltaY * 0.01;
-        handleScroll(scrollDelta, false);
-      }
-
-      lastTouchY.current = clientY;
-      lastTouchTime.current = currentTime;
-    },
-    [handleScroll]
+  const handleTouchMove = useTouchMove(
+    isDragging,
+    lastTouchTime,
+    lastTouchY,
+    touchStartY,
+    touchStartX,
+    touchVelocity,
+    velocity,
+    setScrollPosition
   );
 
   // Handle touch or mouse end with momentum application
   const handleTouchEnd = useTouchEnd(isDragging, touchVelocity, velocity, gl);
 
-  // Reset mesh cache when cards change (scroll or hover)
-  useEffect(() => {
-    cardMeshes.current = [];
-  }, [scrollPosition, hoveredIndex]);
+  // Responsive camera adjustment
+  useResponsiveCamera(camera, size);
 
   // Set up event listeners
   useInitEventListeners(handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd, throttledMouseMove);
 
   // Push active card title to context
   useEffect(() => {
-    console.log(findActiveCard(cards)?.cardOwner);
+    const activeCard = findActiveCard(cards);
+    if (activeCard) {
+      console.log(
+        "Active Card:\nTitle:",
+        activeCard.cardTitle,
+        "\nOwner Title:",
+        activeCard.cardOwnerTitle,
+        "\nOwner Slug:",
+        activeCard.cardOwnerSlug
+      );
+      // setActiveCardTitle(activeCard.cardTitle);
+      // setActiveCardOwner(activeCard.cardOwnerTitle);
+      // setActiveCardOwnerSlug(activeCard.cardOwnerSlug);
+    }
   }, [cards, scrollPosition]);
-
-  // Responsive camera adjustment
-  useResponsiveCamera(camera, size);
 
   return (
     <>
@@ -266,9 +187,20 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
           zPosition={card.zPosition + stackOffset}
           cardIndex={card.cardIndex}
           isActive={card.isActive}
-          imageUrl={card.imageUrl}
+          thumbnailUrl={card.thumbnailUrl}
+          snippetUrl={card.snippetUrl}
           cardTitle={card.cardTitle}
-          cardOwner={card.cardOwner}
+          onClick={() => {
+            if (isDragging.current) {
+              return;
+            } else {
+              if (card.cardIndex !== scrollPosition) {
+                setScrollPosition(card.cardIndex);
+              } else {
+                router.push(`/index/${card.cardOwnerSlug}`);
+              }
+            }
+          }}
         />
       ))}
 
