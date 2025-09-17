@@ -6,6 +6,6 @@ import { CardProps } from "@/app/components/cardStackGallery/CardStackCanvas/Car
 export default function findActiveCard(cards: CardProps[]) {
   const activeCard = cards.find((card) => card.isActive);
   if (activeCard) {
-    return { cardTitle: activeCard.cardTitle, cardOwner: activeCard.cardOwner };
+    return { cardTitle: activeCard.cardTitle, cardOwnerTitle: activeCard.cardOwnerTitle, cardOwnerSlug: activeCard.cardOwnerSlug };
   }
 }
