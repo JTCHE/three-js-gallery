@@ -1,7 +1,9 @@
 export type StackImagesArray = {
-  src: string;
+  thumbnailSrc: string;
+  snippetSrc: string | null;
   title: string;
-  owner: string;
+  ownerTitle: string;
+  ownerSlug: string;
 }[];
 
 // Cache the results
@@ -44,21 +46,26 @@ export default async function fetchStackImages(): Promise<StackImagesArray> {
   cachedImages = Array.isArray(data.data)
     ? data.data
         .map((item: any) => {
-          const src = item.Media?.url ?? "";
-          const owner =
+          const thumbnailSrc = item.Media?.url ?? "";
+          const snippetSrc = item.snippet?.url ?? null;
+          const ownership =
             item.OwnershipType === "project"
-              ? item.project_ownership?.title
+              ? item.project_ownership
               : item.OwnershipType === "article"
-              ? item.article_ownership?.title
-              : "";
+              ? item.article_ownership
+              : {};
+          const ownerTitle = ownership?.title ?? "";
+          const ownerSlug = ownership?.slug ?? "";
           const title = item.title;
-          if (!src || !owner || !title) {
+          if (!thumbnailSrc || !ownerTitle || !title || !ownerSlug) {
             return null;
           }
           return {
-            src,
+            thumbnailSrc,
             title,
-            owner,
+            ownerTitle,
+            ownerSlug,
+            snippetSrc,
           };
         })
         .filter((img: any) => img !== null)
