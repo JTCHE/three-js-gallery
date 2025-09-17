@@ -9,17 +9,20 @@ export type CardProps = {
   zPosition: number;
   cardIndex: number;
   isActive: boolean;
-  imageUrl: string;
+  thumbnailUrl: string;
+  snippetUrl: string | null;
   cardTitle: string;
-  cardOwner: string;
+  cardOwnerTitle?: string;
+  cardOwnerSlug?: string;
+  onClick: () => void;
 };
 
-export default function Card({ zPosition, cardIndex, isActive, imageUrl, cardTitle, cardOwner, baseZ }: CardProps) {
+export default function Card({ zPosition, cardIndex, isActive, thumbnailUrl, snippetUrl, cardTitle, onClick }: CardProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [aspectRatio, setAspectRatio] = useState(1);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  const texture = useLoader(THREE.TextureLoader, imageUrl);
+  const texture = useLoader(THREE.TextureLoader, thumbnailUrl);
 
   useEffect(() => {
     if (texture && texture.image) {
@@ -60,7 +63,7 @@ export default function Card({ zPosition, cardIndex, isActive, imageUrl, cardTit
       ref={meshRef}
       position={[0, 0, 0]}
       scale={[1.2, 1.2, 1]}
-      onClick={() => router.push(`/cardIndex/${cardTitle}`)}
+      onClick={() => onClick()}
       userData={{ cardIndex: cardIndex, cardTitle: cardTitle }}
     >
       <boxGeometry args={[cardWidth, cardHeight, 0.035]} />
