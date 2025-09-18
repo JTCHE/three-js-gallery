@@ -1,8 +1,9 @@
 "use client";
 import { useFrame, useLoader } from "@react-three/fiber";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { GradientMaskMaterial } from "./GradientShader";
+import VideoMaterial from "./VideoMaterial";
 
 export type CardProps = {
   zPosition: number;
@@ -19,21 +20,25 @@ export type CardProps = {
 export default function Card({ zPosition, cardIndex, isActive, thumbnailUrl, snippetUrl, cardTitle, onClick }: CardProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [aspectRatio, setAspectRatio] = useState(1);
-  const [thumbnailLoaded, setThumbnailLoaded] = useState(false);
-  const [snippetLoaded, setSnippetLoaded] = useState(false);
+  const [textureReady, setTextureReady] = useState(false);
+  const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
 
-  const thumbnailTexture = useLoader(THREE.TextureLoader, thumbnailUrl);
-  const snippetTexture = snippetUrl ? useLoader(THREE.TextureLoader, snippetUrl) : null;
-  const texture = snippetTexture ?? thumbnailTexture;
+  const texture = useLoader(THREE.TextureLoader, thumbnailUrl);
+
+  // Determine if the snippet is a video
+  const isVideo = useMemo(() => {
+    if (!snippetUrl) return false;
+    const extension = snippetUrl.split(".").pop()?.toLowerCase();
+    return extension === "mp4";
+  }, [snippetUrl]);
+
+  // Set aspect ratio when texture loads
   useEffect(() => {
     if (texture && texture.image) {
       const img = texture.image;
       const ratio = img.width / img.height;
       setAspectRatio(ratio);
-      setThumbnailLoaded(true);
-      if (snippetUrl) {
-        setSnippetLoaded(true);
-      }
+      setTextureReady(true);
     }
   }, [texture, snippetUrl]);
 
@@ -52,29 +57,54 @@ export default function Card({ zPosition, cardIndex, isActive, thumbnailUrl, sni
     }
   });
 
-  const boxWidth = aspectRatio > 1 ? 2 * aspectRatio : 2;
-  const boxHeight = aspectRatio > 1 ? 2 : 2 / aspectRatio;
+  // Calculate card dimensions
+  const { cardWidth, cardHeight } = useMemo(() => {
+    const boxWidth = aspectRatio > 1 ? 2 * aspectRatio : 2;
+    const boxHeight = aspectRatio > 1 ? 2 : 2 / aspectRatio;
+    const maxDimension = 3;
+    const scaleFactor = Math.min(maxDimension / boxWidth, maxDimension / boxHeight);
 
-  const maxDimension = 3;
-  const scaleFactor = Math.min(maxDimension / boxWidth, maxDimension / boxHeight);
-  const cardWidth = boxWidth * scaleFactor;
-  const cardHeight = boxHeight * scaleFactor;
+    return {
+      cardWidth: boxWidth * scaleFactor,
+      cardHeight: boxHeight * scaleFactor,
+    };
+  }, [aspectRatio]);
 
   return (
-    <>
-      <mesh
-        ref={meshRef}
-        position={[0, 0, 0]}
-        scale={[1.2, 1.2, 1]}
-        onClick={() => onClick()}
-        userData={{ cardIndex: cardIndex, cardTitle: cardTitle }}
+    <mesh
+      ref={meshRef}
+      position={[0, 0, 0]}
+      scale={[1.2, 1.2, 1]}
+      onClick={() => onClick()}
+      userData={{ cardIndex, cardTitle }}
+    >
+      <boxGeometry args={[cardWidth, cardHeight, 0.035]} />
+      <Suspense
+        fallback={
+          <GradientMaskMaterial
+            texture={texture}
+            aspectRatio={aspectRatio}
+          />
+        }
       >
-        <boxGeometry args={[cardWidth, cardHeight, 0.035]} />
-        <GradientMaskMaterial
-          texture={texture}
-          aspectRatio={aspectRatio}
-        />
-      </mesh>
-    </>
+        {snippetUrl && isActive ? (
+          <VideoMaterial
+            url={snippetUrl}
+            aspectRatio={aspectRatio}
+            fallbackTexture={texture}
+            isActive={isActive}
+          />
+        ) : (
+          <GradientMaskMaterial
+            texture={texture}
+            aspectRatio={aspectRatio}
+          />
+        )}
+      </Suspense>
+    </mesh>
   );
 }
+
+// WIP : when video first becomes active, it loads but doesn't play immediately.
+// On subsequent activations, it plays fine.
+// Not sure if it's a react-three-fiber issue or something else.
