@@ -4,14 +4,16 @@ import CardStackCanvas from "./CardStackCanvas/CardStackCanvas";
 // Main Component Export
 export default async function CardStackGallery() {
   let imageArray: StackImagesArray = [];
+  let errorMessage = null;
   try {
     imageArray = await images();
   } catch (error) {
     console.error("Failed to load images:", error);
     imageArray = [];
+    errorMessage = error instanceof Error ? error.message : String(error);
   }
 
-  if (!imageArray || imageArray.length === 0) return null;
+  // if (!imageArray || imageArray.length === 0) return null;
 
   return (
     <div
@@ -22,7 +24,11 @@ export default async function CardStackGallery() {
         backgroundBlendMode: "plus-darker, normal, normal",
       }}
     >
-      <CardStackCanvas images={imageArray} />
+      {errorMessage ? <CardStackCanvas images={imageArray} /> : <LoadFailed error={errorMessage} />}
     </div>
   );
+}
+
+function LoadFailed({ error }) {
+  return <p>load failed: {error}</p>;
 }
