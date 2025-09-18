@@ -24,7 +24,7 @@ export default async function CardStackGallery() {
         backgroundBlendMode: "plus-darker, normal, normal",
       }}
     >
-      {errorMessage ? <CardStackCanvas images={imageArray} /> : <LoadFailed error={errorMessage} />}
+      {!errorMessage ? <CardStackCanvas images={imageArray} /> : <LoadFailed error={errorMessage} />}
     </div>
   );
 }
