@@ -1,6 +1,5 @@
 "use client";
 import { useFrame, useLoader } from "@react-three/fiber";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GradientMaskMaterial } from "./GradientShader";
@@ -20,18 +19,23 @@ export type CardProps = {
 export default function Card({ zPosition, cardIndex, isActive, thumbnailUrl, snippetUrl, cardTitle, onClick }: CardProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [aspectRatio, setAspectRatio] = useState(1);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [thumbnailLoaded, setThumbnailLoaded] = useState(false);
+  const [snippetLoaded, setSnippetLoaded] = useState(false);
 
-  const texture = useLoader(THREE.TextureLoader, thumbnailUrl);
-
+  const thumbnailTexture = useLoader(THREE.TextureLoader, thumbnailUrl);
+  const snippetTexture = snippetUrl ? useLoader(THREE.TextureLoader, snippetUrl) : null;
+  const texture = snippetTexture ?? thumbnailTexture;
   useEffect(() => {
     if (texture && texture.image) {
       const img = texture.image;
       const ratio = img.width / img.height;
       setAspectRatio(ratio);
-      setImageLoaded(true);
+      setThumbnailLoaded(true);
+      if (snippetUrl) {
+        setSnippetLoaded(true);
+      }
     }
-  }, [texture]);
+  }, [texture, snippetUrl]);
 
   useFrame(() => {
     if (meshRef.current) {
@@ -56,21 +60,21 @@ export default function Card({ zPosition, cardIndex, isActive, thumbnailUrl, sni
   const cardWidth = boxWidth * scaleFactor;
   const cardHeight = boxHeight * scaleFactor;
 
-  const router = useRouter();
-
   return (
-    <mesh
-      ref={meshRef}
-      position={[0, 0, 0]}
-      scale={[1.2, 1.2, 1]}
-      onClick={() => onClick()}
-      userData={{ cardIndex: cardIndex, cardTitle: cardTitle }}
-    >
-      <boxGeometry args={[cardWidth, cardHeight, 0.035]} />
-      <GradientMaskMaterial
-        texture={texture}
-        aspectRatio={aspectRatio}
-      />
-    </mesh>
+    <>
+      <mesh
+        ref={meshRef}
+        position={[0, 0, 0]}
+        scale={[1.2, 1.2, 1]}
+        onClick={() => onClick()}
+        userData={{ cardIndex: cardIndex, cardTitle: cardTitle }}
+      >
+        <boxGeometry args={[cardWidth, cardHeight, 0.035]} />
+        <GradientMaskMaterial
+          texture={texture}
+          aspectRatio={aspectRatio}
+        />
+      </mesh>
+    </>
   );
 }
