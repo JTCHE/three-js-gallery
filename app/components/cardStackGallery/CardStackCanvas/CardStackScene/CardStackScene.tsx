@@ -159,14 +159,14 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
   useEffect(() => {
     const activeCard = findActiveCard(cards);
     if (activeCard) {
-      console.log(
-        "Active Card:\nTitle:",
-        activeCard.cardTitle,
-        "\nOwner Title:",
-        activeCard.cardOwnerTitle,
-        "\nOwner Slug:",
-        activeCard.cardOwnerSlug
-      );
+      // console.log(
+      //   "Active Card:\nTitle:",
+      //   activeCard.cardTitle,
+      //   "\nOwner Title:",
+      //   activeCard.cardOwnerTitle,
+      //   "\nOwner Slug:",
+      //   activeCard.cardOwnerSlug
+      // );
       // setActiveCardTitle(activeCard.cardTitle);
       // setActiveCardOwner(activeCard.cardOwnerTitle);
       // setActiveCardOwnerSlug(activeCard.cardOwnerSlug);
