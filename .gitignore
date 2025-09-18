@@ -41,4 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 # local images
-/app/public/img/index/*
+/public/**/*
+
+# Proprietary code
+ComposedTexture.tsx
