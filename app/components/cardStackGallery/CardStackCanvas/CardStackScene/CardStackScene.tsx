@@ -1,27 +1,26 @@
 "use client";
-import { OrthographicCamera } from "@react-three/drei";
-import { useFrame, useThree } from "@react-three/fiber";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import * as THREE from "three";
-import Card, { CardProps } from "./Card/Card";
 import { StackImagesArray } from "@/app/lib/cardStackGallery/fetchStackImages";
 import findActiveCard from "@/app/lib/cardStackGallery/findActiveCard";
 import useResponsiveCamera from "@/app/lib/cardStackGallery/hooks/camera/useResponsiveCamera";
-import useInitEventListeners from "@/app/lib/cardStackGallery/hooks/gestures/useInitEventListeners";
+import useMouseHover from "@/app/lib/cardStackGallery/hooks/gestures/hover/useMouseHover";
+import useHandleWheel from "@/app/lib/cardStackGallery/hooks/gestures/scroll/useHandleWheel";
 import useTouchEnd from "@/app/lib/cardStackGallery/hooks/gestures/touch/useTouchEnd";
 import useTouchMove from "@/app/lib/cardStackGallery/hooks/gestures/touch/useTouchMove";
-import useHandleWheel from "@/app/lib/cardStackGallery/hooks/gestures/scroll/useHandleWheel";
 import useTouchStart from "@/app/lib/cardStackGallery/hooks/gestures/touch/useTouchStart";
-import useMouseHover from "@/app/lib/cardStackGallery/hooks/gestures/hover/useMouseHover";
+import useInitEventListeners from "@/app/lib/cardStackGallery/hooks/gestures/useInitEventListeners";
 import useMemoizeCards from "@/app/lib/cardStackGallery/hooks/utils/useMemoizeCards";
+import { OrthographicCamera } from "@react-three/drei";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import * as THREE from "three";
+import Card from "./Card/Card";
 
 export default function CardStackScene({ images }: { images: StackImagesArray }) {
   const router = useRouter();
 
   const imageCount = images.length;
   const spacing = 2.5;
-  const renderDistance = 10;
 
   const [scrollPosition, setScrollPosition] = useState(0);
   const [stackOffset, setStackOffset] = useState(0);
@@ -55,12 +54,9 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
   const cards = useMemoizeCards({
     scrollPosition,
     hoveredIndex,
-    hoverTimeout,
     imageCount,
     images,
-    renderDistance,
     spacing,
-    camera,
   });
 
   // Optimized mouse move handler with cached meshes
@@ -77,19 +73,16 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
   );
 
   // Throttled mouse move to prevent flickering on hover
-  const throttledMouseMove = useCallback(
-    (() => {
-      let timeoutId: NodeJS.Timeout | null = null;
-      return (event: MouseEvent) => {
-        if (timeoutId) return;
-        timeoutId = setTimeout(() => {
-          handleMouseMove(event);
-          timeoutId = null;
-        }, 16); // ~60fps
-      };
-    })(),
-    [handleMouseMove]
-  );
+  const throttledMouseMove = useCallback(() => {
+    let timeoutId: NodeJS.Timeout | null = null;
+    return (event: MouseEvent) => {
+      if (timeoutId) return;
+      timeoutId = setTimeout(() => {
+        handleMouseMove(event);
+        timeoutId = null;
+      }, 16);
+    };
+  }, [handleMouseMove])();
 
   // Smooth stack movement with momentum
   useFrame((_, delta) => {
@@ -187,9 +180,14 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
           zPosition={card.zPosition + stackOffset}
           cardIndex={card.cardIndex}
           isActive={card.isActive}
+          imageWidth={card.imageWidth}
+          imageHeight={card.imageHeight}
+          placeholderUrl={card.placeholderUrl}
           thumbnailUrl={card.thumbnailUrl}
           snippetUrl={card.snippetUrl}
           cardTitle={card.cardTitle}
+          shouldLoadFull={card.shouldLoadFull}
+          isInRenderDistance={card.isInRenderDistance}
           onClick={() => {
             if (isDragging.current) {
               return;
