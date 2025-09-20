@@ -52,6 +52,6 @@ export default function useMouseHover(
         gl.domElement.style.cursor = "grab";
       }
     },
-    [camera, gl, scene]
+    [camera, gl, scene, cardMeshes, isDragging, mouse, raycaster, setHoveredIndex, hoverTimeout]
   );
 }
