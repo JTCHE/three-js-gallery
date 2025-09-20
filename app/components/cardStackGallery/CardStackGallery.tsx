@@ -13,22 +13,27 @@ export default async function CardStackGallery() {
     errorMessage = error instanceof Error ? error.message : String(error);
   }
 
-  // if (!imageArray || imageArray.length === 0) return null;
-
   return (
     <div
-      className="w-full h-screen overflow-hidden touch-none"
-      style={{
-        background:
-          "linear-gradient(167deg, rgba(18, 18, 18, 0.00) 50%, rgba(18, 18, 18, 0.05) 92.09%), linear-gradient(165deg, rgba(252, 252, 252, 0.30) 9.01%, rgba(252, 252, 252, 0.05) 90.99%), rgba(252, 252, 252, 1)",
-        backgroundBlendMode: "plus-darker, normal, normal",
-      }}
+      className="w-screen h-screen overflow-hidden touch-none flex justify-center items-center"
     >
-      {!errorMessage ? <CardStackCanvas images={imageArray} /> : <LoadFailed error={errorMessage} />}
+      {!errorMessage ? ( // <Suspense fallback={<span className="text-neutral-500">Loading gallery...</span>}>
+        <CardStackCanvas images={imageArray} />
+      ) : (
+        // </Suspense>
+        <LoadFailed error={errorMessage} />
+      )}
     </div>
   );
 }
 
-function LoadFailed({ error }) {
-  return <p>load failed: {error}</p>;
+function LoadFailed({ error }: { error: string }) {
+  return (
+    <div className="flex flex-col">
+      <p className="text-neutral-500">oops, something happened whilst loading the gallery.</p>
+      <p className="text-neutral-500 lowercase">
+        <span>{error}</span>
+      </p>
+    </div>
+  );
 }
