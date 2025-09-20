@@ -1,5 +1,5 @@
 import React, { useCallback } from "react";
-import { useHandleScrollLogic } from "../scroll/useHandleScroll";
+import { handleScrollLogic } from "../scroll/handleScrollLogic";
 
 export default function useTouchMove(
   isDragging: React.RefObject<boolean>,
@@ -39,7 +39,7 @@ export default function useTouchMove(
       if (Math.abs(totalDeltaY) > Math.abs(totalDeltaX) && Math.abs(deltaY) > 2) {
         const scrollDelta = -deltaY * 0.01;
         // Use the utility function instead of the hook
-        useHandleScrollLogic(scrollDelta, velocity, setScrollPosition, false);
+        handleScrollLogic(scrollDelta, velocity, setScrollPosition, false);
       }
 
       lastTouchY.current = clientY;
