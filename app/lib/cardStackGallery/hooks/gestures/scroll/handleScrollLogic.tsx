@@ -1,6 +1,6 @@
 // This hook handles scroll events and updates the scroll position with momentum.
 
-export function useHandleScrollLogic(
+export function handleScrollLogic(
   delta: number, 
   velocity: React.RefObject<number>, 
   setScrollPosition: (fn: (current: number) => number) => void,
