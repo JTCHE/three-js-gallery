@@ -14,5 +14,5 @@ export default function useTouchEnd(
     }
     gl.domElement.style.cursor = "grab";
     isDragging.current = false;
-  }, []);
+  }, [gl.domElement.style, isDragging, touchVelocity, velocity]);
 }
