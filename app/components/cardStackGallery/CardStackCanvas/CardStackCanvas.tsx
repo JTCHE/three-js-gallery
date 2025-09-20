@@ -7,15 +7,16 @@ export default function CardStackCanvas({ images }: { images: StackImagesArray }
   if (!images || images.length === 0) return null;
 
   return (
-
-      <Canvas
-        className="w-full h-full"
-        gl={{
-          antialias: true,
-        }}
-        style={{ touchAction: "none", width: "100%", height: "100%" }}
-      >
-        <CardStackScene images={images} />
-      </Canvas>
+    <Canvas
+      gl={{
+        antialias: true,
+        alpha: true,
+      }}
+      style={{
+        touchAction: "none",
+      }}
+    >
+      <CardStackScene images={images} />
+    </Canvas>
   );
 }
