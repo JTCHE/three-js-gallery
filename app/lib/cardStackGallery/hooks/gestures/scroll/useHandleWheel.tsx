@@ -2,7 +2,7 @@
 // It normalizes the wheel delta and applies a maximum speed limit.
 
 import { useCallback } from "react";
-import { useHandleScrollLogic } from "./useHandleScroll";
+import { handleScrollLogic } from "./handleScrollLogic";
 
 export type handleWheelProps = {
   velocity: React.RefObject<number>;
@@ -16,7 +16,7 @@ export default function useHandleWheel(velocity: handleWheelProps["velocity"], s
       const rawDelta = event.deltaY > 0 ? -0.5 : 0.5;
       const maxWheelSpeed = 0.5;
       const delta = Math.max(-maxWheelSpeed, Math.min(maxWheelSpeed, rawDelta));
-      useHandleScrollLogic(delta, velocity, setScrollPosition, true);
+      handleScrollLogic(delta, velocity, setScrollPosition, true);
     },
     [velocity, setScrollPosition]
   );
