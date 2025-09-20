@@ -1,46 +1,86 @@
 "use client";
+import { useVideoTexture } from "@react-three/drei";
 import { useFrame, useLoader } from "@react-three/fiber";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { GradientMaskMaterial } from "./GradientShader";
-import VideoMaterial from "./VideoMaterial";
 
 export type CardProps = {
+  imageWidth: number;
+  imageHeight: number;
   zPosition: number;
   cardIndex: number;
   isActive: boolean;
   thumbnailUrl: string;
+  placeholderUrl: string;
   snippetUrl: string | null;
   cardTitle: string;
   cardOwnerTitle?: string;
   cardOwnerSlug?: string;
   onClick: () => void;
+  shouldLoadFull?: boolean;
+  isInRenderDistance: boolean;
 };
 
-export default function Card({ zPosition, cardIndex, isActive, thumbnailUrl, snippetUrl, cardTitle, onClick }: CardProps) {
+export default function Card({
+  imageWidth,
+  imageHeight,
+  zPosition,
+  cardIndex,
+  isActive,
+  thumbnailUrl,
+  snippetUrl,
+  cardTitle,
+  placeholderUrl,
+  shouldLoadFull,
+  isInRenderDistance,
+
+  onClick,
+}: CardProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [aspectRatio, setAspectRatio] = useState(1);
-  const [textureReady, setTextureReady] = useState(false);
-  const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
+  const [loadFullRes, setLoadFullRes] = useState(false);
+  const [playVideo, setPlayVideo] = useState(false);
 
-  const texture = useLoader(THREE.TextureLoader, thumbnailUrl);
+  const placeholderTexture = useLoader(THREE.TextureLoader, placeholderUrl);
+  const fullResTexture = useLazyTexture(thumbnailUrl, loadFullRes);
 
-  // Determine if the snippet is a video
-  const isVideo = useMemo(() => {
-    if (!snippetUrl) return false;
-    const extension = snippetUrl.split(".").pop()?.toLowerCase();
-    return extension === "mp4";
-  }, [snippetUrl]);
+  let snippetTexture: THREE.VideoTexture | null = null;
+  if (snippetUrl) {
+    snippetTexture = useVideoTexture(snippetUrl);
+  }
 
-  // Set aspect ratio when texture loads
+  const [currentTexture, setCurrentTexture] = useState(placeholderTexture);
+
+  // Decide which texture resolution to use
   useEffect(() => {
-    if (texture && texture.image) {
-      const img = texture.image;
-      const ratio = img.width / img.height;
-      setAspectRatio(ratio);
-      setTextureReady(true);
+    if (playVideo && snippetTexture) {
+      setCurrentTexture(snippetTexture);
+    } else if (fullResTexture) {
+      setCurrentTexture(fullResTexture);
+    } else {
+      setCurrentTexture(placeholderTexture);
     }
-  }, [texture, snippetUrl]);
+  }, [playVideo, snippetTexture, fullResTexture, placeholderTexture]);
+
+  // Decide when to load full resolution texture
+  useEffect(() => {
+    if (shouldLoadFull) {
+      setLoadFullRes(true);
+    } else {
+      setLoadFullRes(false);
+    }
+  }, [isInRenderDistance, shouldLoadFull]);
+
+  // Handle video play/pause based on active state
+  useEffect(() => {
+    if (isActive && snippetTexture) {
+      snippetTexture.image.currentTime = 0; // Reset to start
+      setPlayVideo(true);
+    } else if (!isActive && snippetTexture) {
+      setPlayVideo(false);
+    }
+  }, [isActive, snippetTexture]);
 
   useFrame(() => {
     if (meshRef.current) {
@@ -57,7 +97,14 @@ export default function Card({ zPosition, cardIndex, isActive, thumbnailUrl, sni
     }
   });
 
-  // Calculate card dimensions
+  // Calculate aspect ratio
+  useEffect(() => {
+    if (imageWidth && imageHeight) {
+      setAspectRatio(imageWidth / imageHeight);
+    }
+  }, [imageWidth, imageHeight]);
+
+  // Calculate card dimensions based on aspect ratio
   const { cardWidth, cardHeight } = useMemo(() => {
     const boxWidth = aspectRatio > 1 ? 2 * aspectRatio : 2;
     const boxHeight = aspectRatio > 1 ? 2 : 2 / aspectRatio;
@@ -79,32 +126,34 @@ export default function Card({ zPosition, cardIndex, isActive, thumbnailUrl, sni
       userData={{ cardIndex, cardTitle }}
     >
       <boxGeometry args={[cardWidth, cardHeight, 0.035]} />
-      <Suspense
-        fallback={
-          <GradientMaskMaterial
-            texture={texture}
-            aspectRatio={aspectRatio}
-          />
-        }
-      >
-        {snippetUrl && isActive ? (
-          <VideoMaterial
-            url={snippetUrl}
-            aspectRatio={aspectRatio}
-            fallbackTexture={texture}
-            isActive={isActive}
-          />
-        ) : (
-          <GradientMaskMaterial
-            texture={texture}
-            aspectRatio={aspectRatio}
-          />
-        )}
-      </Suspense>
+      <GradientMaskMaterial
+        key={currentTexture.uuid}
+        texture={currentTexture}
+        aspectRatio={aspectRatio}
+      />
     </mesh>
   );
 }
 
-// WIP : when video first becomes active, it loads but doesn't play immediately.
-// On subsequent activations, it plays fine.
-// Not sure if it's a react-three-fiber issue or something else.
+function useLazyTexture(url: string, shouldLoad: boolean) {
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!shouldLoad || isLoaded) return;
+
+    const loader = new THREE.TextureLoader();
+    loader.load(url, (loadedTexture) => {
+      setTexture(loadedTexture);
+      setIsLoaded(true);
+    });
+
+    return () => {
+      if (texture && !isLoaded) {
+        texture.dispose();
+      }
+    };
+  }, [url, shouldLoad, isLoaded, texture]);
+
+  return texture;
+}
