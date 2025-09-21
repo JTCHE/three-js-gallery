@@ -1,16 +1,21 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
+// Create shared fallback texture once
+const createFallbackTexture = (() => {
+  let texture: THREE.Texture | null = null;
+  return () => {
+    if (!texture) {
+      const data = new Uint8Array([255, 255, 255, 0]);
+      texture = new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat);
+      texture.needsUpdate = true;
+    }
+    return texture;
+  };
+})();
+
 export const GradientMaskMaterial = ({ texture, aspectRatio }: { texture?: THREE.Texture; aspectRatio?: number }) => {
   const materialRef = useRef<THREE.ShaderMaterial>(null!);
-
-  // If no texture is provided, use a 1x1 white texture
-  const fallbackTexture = useRef<THREE.Texture | null>(null);
-  if (!fallbackTexture.current) {
-    const transparentWhiteData = new Uint8Array([255, 255, 255, 0]);
-    fallbackTexture.current = new THREE.DataTexture(transparentWhiteData, 1, 1, THREE.RGBAFormat);
-    fallbackTexture.current.needsUpdate = true;
-  }
 
   const vertexShader = `
     varying vec2 vUv;
@@ -26,42 +31,41 @@ export const GradientMaskMaterial = ({ texture, aspectRatio }: { texture?: THREE
     uniform float uMaskInset;
     varying vec2 vUv;
 
+    // Optimized mask with smoother falloff using pow for better curve
     float createMask(vec2 uv, float inset) {
-      float left = smoothstep(0.0, inset, uv.x);
-      float right = smoothstep(1.0, 1.0 - inset, uv.x);
-      float bottom = smoothstep(0.0, inset, uv.y);
-      float top = smoothstep(1.0, 1.0 - inset, uv.y);
-      return left * right * bottom * top;
+      vec2 d = min(uv, 1.0 - uv);
+      float mask = min(d.x, d.y) / inset;
+      return pow(clamp(mask, 0.0, 1.0), 0.6); // Smoother curve
     }
 
     void main() {
       vec2 uv = vUv;
-      float mask = createMask(uv, 0.2);
-      vec4 color = vec4(0.0);
-      float blurAmount = (1.0 - mask) * 0.004;
-      for(int x = -2; x <= 2; x++) {
-        for(int y = -2; y <= 2; y++) {
-          vec2 offset = vec2(float(x), float(y)) * blurAmount;
-          color += texture2D(uTexture, uv + offset);
-        }
-      }
-      color /= 25.0;
-      color.a = mix(0.8, 1.0, mask);
+      float mask = createMask(uv, 0.15);
       
+      // Ultra-efficient 4-sample blur - works on any GPU
+      float blurAmount = (1.0 - mask) * 0.01;
+      vec4 color = texture2D(uTexture, uv);
+      color += texture2D(uTexture, uv + vec2(blurAmount, 0.0));
+      color += texture2D(uTexture, uv + vec2(-blurAmount, 0.0));
+      color += texture2D(uTexture, uv + vec2(0.0, blurAmount));
+      color += texture2D(uTexture, uv + vec2(0.0, -blurAmount));
+      
+      color *= 0.2; // /5 samples
+      color.a = mix(0.8, 1.0, mask);
+
       gl_FragColor = color;
     }
   `;
 
   const uniforms = {
-    uTexture: { value: texture || fallbackTexture.current },
+    uTexture: { value: texture || createFallbackTexture() },
     uAspectRatio: { value: aspectRatio },
     uMaskInset: { value: 0.2 },
   };
 
-  // Update uniform when texture changes
   useEffect(() => {
     if (materialRef.current) {
-      materialRef.current.uniforms.uTexture.value = texture || fallbackTexture.current;
+      materialRef.current.uniforms.uTexture.value = texture || createFallbackTexture();
     }
   }, [texture]);
 
