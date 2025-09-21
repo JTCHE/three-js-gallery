@@ -4,6 +4,7 @@ import { useFrame, useLoader } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { GradientMaskMaterial } from "./GradientShader";
+import useLazyTexture from "@/app/lib/cardStackGallery/hooks/textures/useLazyTexture";
 
 export type CardProps = {
   imageWidth: number;
@@ -45,10 +46,7 @@ export default function Card({
   const placeholderTexture = useLoader(THREE.TextureLoader, placeholderUrl);
   const fullResTexture = useLazyTexture(thumbnailUrl, loadFullRes);
 
-  let snippetTexture: THREE.VideoTexture | null = null;
-  if (snippetUrl) {
-    snippetTexture = useVideoTexture(snippetUrl);
-  }
+  const snippetTexture = snippetUrl ? useVideoTexture(snippetUrl) : null;
 
   const [currentTexture, setCurrentTexture] = useState(placeholderTexture);
 
@@ -133,27 +131,4 @@ export default function Card({
       />
     </mesh>
   );
-}
-
-function useLazyTexture(url: string, shouldLoad: boolean) {
-  const [texture, setTexture] = useState<THREE.Texture | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  useEffect(() => {
-    if (!shouldLoad || isLoaded) return;
-
-    const loader = new THREE.TextureLoader();
-    loader.load(url, (loadedTexture) => {
-      setTexture(loadedTexture);
-      setIsLoaded(true);
-    });
-
-    return () => {
-      if (texture && !isLoaded) {
-        texture.dispose();
-      }
-    };
-  }, [url, shouldLoad, isLoaded, texture]);
-
-  return texture;
 }
