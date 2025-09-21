@@ -9,7 +9,9 @@ export default function CardStackCanvas({ images }: { images: StackImagesArray }
   return (
     <Canvas
       gl={{
-        antialias: true,
+        antialias: false,
+        depth: false,
+        powerPreference: "high-performance",
         alpha: true,
       }}
       style={{
