@@ -15,10 +15,10 @@ export default function useMemoizeCards({
   images: StackImagesArray;
   spacing: number;
 }) {
-  const renderDistance = 7;
+  const renderDistance = 12;
+  const centerIndex = Math.round(scrollPosition);
 
   return useMemo(() => {
-    const centerIndex = Math.round(scrollPosition);
     const cardData: Array<CardProps> = [];
 
     for (let i = centerIndex - renderDistance; i <= centerIndex + renderDistance; i++) {
@@ -50,5 +50,5 @@ export default function useMemoizeCards({
       });
     }
     return cardData;
-  }, [scrollPosition, hoveredIndex, imageCount, images, spacing, renderDistance]);
+  }, [scrollPosition, hoveredIndex, imageCount, images, spacing]);
 }
