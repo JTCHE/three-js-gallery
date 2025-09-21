@@ -73,16 +73,19 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
   );
 
   // Throttled mouse move to prevent flickering on hover
-  const throttledMouseMove = useCallback(() => {
-    let timeoutId: NodeJS.Timeout | null = null;
-    return (event: MouseEvent) => {
-      if (timeoutId) return;
-      timeoutId = setTimeout(() => {
-        handleMouseMove(event);
-        timeoutId = null;
-      }, 16);
-    };
-  }, [handleMouseMove])();
+  const throttledMouseMove = useCallback(
+    (() => {
+      let timeoutId: NodeJS.Timeout | null = null;
+      return (event: MouseEvent) => {
+        if (timeoutId) return;
+        timeoutId = setTimeout(() => {
+          handleMouseMove(event);
+          timeoutId = null;
+        }, 16); // ~60fps
+      };
+    })(),
+    [handleMouseMove]
+  );
 
   // Smooth stack movement with momentum
   useFrame((_, delta) => {
