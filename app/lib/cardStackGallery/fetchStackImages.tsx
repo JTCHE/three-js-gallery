@@ -9,19 +9,6 @@ export type StackImagesArray = {
   ownerSlug: string;
 }[];
 
-// Initialize the array cache for the results
-let cachedImages: StackImagesArray | null = null;
-
-// Utility function to shuffle an array
-function shuffleArray<T>(array: T[]): T[] {
-  const arr = [...array];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
 // Define the expected structure of the gallery image item from the API
 interface GalleryOwnership {
   title?: string;
@@ -47,6 +34,19 @@ interface GalleryItem {
   project_ownership?: GalleryOwnership;
   article_ownership?: GalleryOwnership;
   title?: string;
+}
+
+// Initialize the array cache for the results
+let cachedImages: StackImagesArray | null = null;
+
+// Utility function to shuffle an array
+function shuffleArray<T>(array: T[]): T[] {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }
 
 // fetchStackImages function that pulls from strapi api (STRAPI_BASE_URL and STRAPI_API_KEY env vars must be set) from the gallery-images collection type. fetch all images and console log and return the array
@@ -92,7 +92,7 @@ export default async function fetchStackImages(): Promise<StackImagesArray> {
           const ownerTitle = ownership?.title ?? "";
           const ownerSlug = ownership?.slug ?? "";
           const title = item.title;
-          if (!thumbnailSrc || !ownerTitle || !title || !ownerSlug) {
+          if (!thumbnailSrc || !ownership || !title || !ownerSlug) {
             return null;
           }
           return {
