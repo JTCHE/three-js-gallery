@@ -30,7 +30,7 @@ export default function useMemoizeCards({
       // Determine what to load based on distance
       const immediateLoadDistance = 3; // Load full images within 3 cards, starting from center, backwards and forwards (7 total)
       const shouldLoadFullImage = distanceFromCenter <= immediateLoadDistance;
-      const isInRenderDistance = distanceFromCenter <= renderDistance;
+      // const isInRenderDistance = distanceFromCenter <= renderDistance;
 
       cardData.push({
         cardIndex: i,
@@ -45,10 +45,9 @@ export default function useMemoizeCards({
         cardOwnerTitle: images[imageIndex].ownerTitle,
         cardOwnerSlug: images[imageIndex].ownerSlug,
         shouldLoadFull: shouldLoadFullImage,
-        isInRenderDistance,
         onClick: () => void 0, // Placeholder, will be set in CardStackScene
       });
     }
     return cardData;
-  }, [scrollPosition, hoveredIndex, imageCount, images, spacing]);
+  }, [scrollPosition, hoveredIndex, imageCount, images, spacing, centerIndex]);
 }

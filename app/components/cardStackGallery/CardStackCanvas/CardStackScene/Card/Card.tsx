@@ -20,7 +20,6 @@ export type CardProps = {
   cardOwnerSlug?: string;
   onClick: () => void;
   shouldLoadFull?: boolean;
-  isInRenderDistance: boolean;
 };
 
 export default function Card({
@@ -34,7 +33,6 @@ export default function Card({
   cardTitle,
   placeholderUrl,
   shouldLoadFull,
-  isInRenderDistance,
 
   onClick,
 }: CardProps) {
@@ -68,7 +66,7 @@ export default function Card({
     } else {
       setLoadFullRes(false);
     }
-  }, [isInRenderDistance, shouldLoadFull]);
+  }, [shouldLoadFull]);
 
   // Handle video play/pause based on active state
   useEffect(() => {

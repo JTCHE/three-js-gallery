@@ -31,6 +31,8 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
   const raycaster = useRef(new THREE.Raycaster());
   const mouse = useRef(new THREE.Vector2());
 
+  
+
   // Cache card meshes to avoid scene traversal
   const cardMeshes = useRef<THREE.Mesh[]>([]);
   // Reset mesh cache when cards change (scroll or hover)
@@ -190,7 +192,6 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
           snippetUrl={card.snippetUrl}
           cardTitle={card.cardTitle}
           shouldLoadFull={card.shouldLoadFull}
-          isInRenderDistance={card.isInRenderDistance}
           onClick={() => {
             if (isDragging.current) {
               return;
