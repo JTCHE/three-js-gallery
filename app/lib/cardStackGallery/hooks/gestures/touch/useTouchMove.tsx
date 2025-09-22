@@ -9,13 +9,11 @@ export default function useTouchMove(
   touchStartX: React.RefObject<number>,
   touchVelocity: React.RefObject<number>,
   velocity: React.RefObject<number>,
-  setScrollPosition: React.Dispatch<React.SetStateAction<number>>
+  setScrollPosition: React.Dispatch<React.SetStateAction<number>>,
+  gl: { domElement: HTMLElement }
 ) {
   return useCallback(
     (event: TouchEvent | MouseEvent) => {
-      event.preventDefault();
-      if (!isDragging.current) return;
-
       let clientY, clientX;
       if ("touches" in event && event.touches.length > 0) {
         clientY = event.touches[0].clientY;
@@ -25,6 +23,21 @@ export default function useTouchMove(
         clientX = (event as MouseEvent).clientX;
       }
 
+      const totalDeltaY = clientY - touchStartY.current;
+      const totalDeltaX = clientX - touchStartX.current;
+      const moveDistance = Math.sqrt(totalDeltaY * totalDeltaY + totalDeltaX * totalDeltaX);
+
+      // For touch events, check if we should start dragging
+      if ("touches" in event && !isDragging.current && moveDistance > 5) {
+        isDragging.current = true;
+        gl.domElement.style.cursor = "grabbing";
+      }
+
+      // Only proceed if we're dragging
+      if (!isDragging.current) return;
+
+      event.preventDefault();
+
       const currentTime = performance.now();
       const deltaTime = currentTime - lastTouchTime.current;
       const deltaY = clientY - lastTouchY.current;
@@ -33,18 +46,14 @@ export default function useTouchMove(
         touchVelocity.current = (-deltaY / deltaTime) * 16;
       }
 
-      const totalDeltaY = clientY - touchStartY.current;
-      const totalDeltaX = clientX - touchStartX.current;
-
       if (Math.abs(totalDeltaY) > Math.abs(totalDeltaX) && Math.abs(deltaY) > 2) {
         const scrollDelta = -deltaY * 0.01;
-        // Use the utility function instead of the hook
         handleScrollLogic(scrollDelta, velocity, setScrollPosition, false);
       }
 
       lastTouchY.current = clientY;
       lastTouchTime.current = currentTime;
     },
-    [velocity, setScrollPosition, isDragging, lastTouchTime, lastTouchY, touchStartY, touchStartX, touchVelocity]
+    [velocity, setScrollPosition, isDragging, lastTouchTime, lastTouchY, touchStartY, touchStartX, touchVelocity, gl.domElement.style]
   );
 }

@@ -8,8 +8,8 @@ export default function useTouchEnd(
 ) {
   return useCallback(
     (event: TouchEvent | MouseEvent) => {
-      event.preventDefault();
       if (isDragging.current) {
+        event.preventDefault();
         velocity.current = touchVelocity.current * 0.1;
         velocity.current = Math.max(-3, Math.min(3, velocity.current));
       }

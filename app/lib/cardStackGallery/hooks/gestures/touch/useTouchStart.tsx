@@ -17,25 +17,26 @@ export default function useTouchStart(
         return;
       }
 
-      event.preventDefault();
-
       let clientY, clientX;
       if ("touches" in event && event.touches.length > 0) {
         clientY = event.touches[0].clientY;
         clientX = event.touches[0].clientX;
+        // For touch, don't preventDefault yet - wait for movement
       } else {
         clientY = (event as MouseEvent).clientY;
         clientX = (event as MouseEvent).clientX;
+        // For mouse, immediately start dragging
+        event.preventDefault();
+        isDragging.current = true;
+        gl.domElement.style.cursor = "grabbing";
       }
 
       touchStartY.current = clientY;
       touchStartX.current = clientX;
       lastTouchY.current = clientY;
-      isDragging.current = true;
       velocity.current = 0;
       touchVelocity.current = 0;
       lastTouchTime.current = performance.now();
-      gl.domElement.style.cursor = "grabbing";
     },
     [gl.domElement.style, isDragging, lastTouchTime, lastTouchY, touchStartX, touchStartY, touchVelocity, velocity]
   );
