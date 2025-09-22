@@ -8,12 +8,14 @@ export default function useMemoizeCards({
   imageCount,
   images,
   spacing,
+  isAnimating,
 }: {
   scrollPosition: number;
   hoveredIndex: number | null;
   imageCount: number;
   images: StackImagesArray;
   spacing: number;
+  isAnimating: boolean;
 }) {
   const renderDistance = 12;
   const centerIndex = Math.round(scrollPosition);
@@ -41,13 +43,14 @@ export default function useMemoizeCards({
         snippetUrl: images[imageIndex].snippetSrc,
         cardTitle: images[imageIndex].title,
         zPosition: i * spacing,
-        isActive: hoveredIndex !== null ? i === hoveredIndex : i === centerIndex,
+        isActive: isAnimating ? false : hoveredIndex !== null ? i === hoveredIndex : i === centerIndex,
         cardOwnerTitle: images[imageIndex].ownerTitle,
         cardOwnerSlug: images[imageIndex].ownerSlug,
         shouldLoadFull: shouldLoadFullImage,
+        isVisible: true,
         onClick: () => void 0, // Placeholder, will be set in CardStackScene
       });
     }
     return cardData;
-  }, [scrollPosition, hoveredIndex, imageCount, images, spacing, centerIndex]);
+  }, [hoveredIndex, imageCount, images, spacing, centerIndex, isAnimating]);
 }
