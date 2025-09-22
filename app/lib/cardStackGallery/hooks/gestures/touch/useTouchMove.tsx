@@ -54,6 +54,16 @@ export default function useTouchMove(
       lastTouchY.current = clientY;
       lastTouchTime.current = currentTime;
     },
-    [velocity, setScrollPosition, isDragging, lastTouchTime, lastTouchY, touchStartY, touchStartX, touchVelocity, gl.domElement.style]
+    [
+      velocity,
+      setScrollPosition,
+      isDragging,
+      lastTouchTime,
+      lastTouchY,
+      touchStartY,
+      touchStartX,
+      touchVelocity,
+      gl.domElement.style,
+    ]
   );
 }
