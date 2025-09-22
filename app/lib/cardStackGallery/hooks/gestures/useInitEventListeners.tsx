@@ -12,11 +12,12 @@ export default function useInitEventListeners(
   handleTouchMove: UseInitEventListenersParams["touchEvent"],
   handleTouchEnd: UseInitEventListenersParams["touchEvent"],
   throttledMouseMove: UseInitEventListenersParams["mouseEvent"],
-  handleClick: UseInitEventListenersParams["mouseEvent"]
+  handleClick: UseInitEventListenersParams["mouseEvent"],
+  isAnimating: boolean
 ): void {
   useEffect(() => {
     const canvas = document.querySelector("canvas");
-    if (canvas) {
+    if (canvas && !isAnimating) {
       canvas.addEventListener("wheel", handleWheel, { passive: false });
       canvas.addEventListener("mousedown", handleTouchStart, { passive: false });
       canvas.addEventListener("mousemove", handleTouchMove, { passive: false });
@@ -41,5 +42,5 @@ export default function useInitEventListeners(
         canvas.removeEventListener("touchend", handleTouchEnd);
       };
     }
-  }, [handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd, throttledMouseMove]);
+  }, [handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd, throttledMouseMove, handleClick, isAnimating]);
 }
