@@ -1,6 +1,6 @@
 // take in slug param
-export default function projectPage({ params }: { params: { slug: string } }) {
-  const { slug } = params;
+export default async function projectPage({ params }: { params: { slug: string } }) {
+  const { slug } = await params;
 
   return (
     <div>
