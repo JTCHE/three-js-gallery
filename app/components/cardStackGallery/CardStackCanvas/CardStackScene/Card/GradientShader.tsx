@@ -79,7 +79,7 @@ export const GradientMaskMaterial = ({
       uMaskInset: { value: 0.2 },
       uOpacity: { value: opacity },
     }),
-    []
+    [aspectRatio, texture]
   );
 
   useEffect(() => {
