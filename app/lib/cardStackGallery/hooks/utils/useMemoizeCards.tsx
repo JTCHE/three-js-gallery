@@ -5,18 +5,18 @@ import { StackImagesArray } from "../../fetchStackImages";
 export default function useMemoizeCards({
   scrollPosition,
   hoveredIndex,
-  imageCount,
   images,
   spacing,
   isAnimating,
 }: {
   scrollPosition: number;
   hoveredIndex: number | null;
-  imageCount: number;
   images: StackImagesArray;
   spacing: number;
   isAnimating: boolean;
 }) {
+  const imageCount = images.length;
+  // How many cards to render on either side of center index (12 each side = 25 total)
   const renderDistance = 12;
   const centerIndex = Math.round(scrollPosition);
 
@@ -32,7 +32,6 @@ export default function useMemoizeCards({
       // Determine what to load based on distance
       const immediateLoadDistance = 3; // Load full images within 3 cards, starting from center, backwards and forwards (7 total)
       const shouldLoadFullImage = distanceFromCenter <= immediateLoadDistance;
-      // const isInRenderDistance = distanceFromCenter <= renderDistance;
 
       cardData.push({
         cardIndex: i,
@@ -48,7 +47,6 @@ export default function useMemoizeCards({
         cardOwnerSlug: images[imageIndex].ownerSlug,
         shouldLoadFull: shouldLoadFullImage,
         isVisible: true,
-        onClick: () => void 0, // Placeholder, will be set in CardStackScene
       });
     }
     return cardData;
