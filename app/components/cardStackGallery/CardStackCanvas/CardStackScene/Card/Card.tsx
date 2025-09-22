@@ -17,9 +17,10 @@ export type CardProps = {
   snippetUrl: string | null;
   cardTitle: string;
   cardOwnerTitle?: string;
-  cardOwnerSlug?: string;
+  cardOwnerSlug: string;
   onClick: () => void;
   shouldLoadFull?: boolean;
+  isVisible: boolean;
 };
 
 export default function Card({
@@ -33,7 +34,7 @@ export default function Card({
   cardTitle,
   placeholderUrl,
   shouldLoadFull,
-
+  isVisible,
   onClick,
 }: CardProps) {
   const meshRef = useRef<THREE.Mesh>(null);
@@ -44,6 +45,7 @@ export default function Card({
   const placeholderTexture = useLoader(THREE.TextureLoader, placeholderUrl);
   const fullResTexture = useLazyTexture(thumbnailUrl, loadFullRes);
 
+  // eslint-disable-next-line
   const snippetTexture = snippetUrl ? useVideoTexture(snippetUrl) : null;
 
   const [currentTexture, setCurrentTexture] = useState(placeholderTexture);
@@ -78,6 +80,8 @@ export default function Card({
     }
   }, [isActive, snippetTexture]);
 
+  const [opacity, setOpacity] = useState(1);
+
   useFrame(() => {
     if (meshRef.current) {
       // Smooth scale animation
@@ -90,6 +94,10 @@ export default function Card({
 
       // Set Z position directly
       meshRef.current.position.z = zPosition;
+
+      // Fade in/out based on isVisible
+      const targetOpacity = isVisible ? 1 : 0;
+      setOpacity((current) => THREE.MathUtils.lerp(current, targetOpacity, 0.2));
     }
   });
 
@@ -126,6 +134,7 @@ export default function Card({
         key={currentTexture.uuid}
         texture={currentTexture}
         aspectRatio={aspectRatio}
+        opacity={opacity}
       />
     </mesh>
   );
