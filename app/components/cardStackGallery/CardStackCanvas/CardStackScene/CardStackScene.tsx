@@ -25,13 +25,19 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
   const [scrollPosition, setScrollPosition] = useState(0);
   const [stackOffset, setStackOffset] = useState(0);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [pendingSlug, setPendingSlug] = useState<string | null>(null);
+  const [animatingCardIndex, setAnimatingCardIndex] = useState<number | null>(null);
+  const [lookAtValue, setLookAtValue] = useState(new THREE.Vector3(0, 0.5, 0));
+
+  // Camera animation state
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [cameraPosition, setCameraPosition] = useState<[number, number, number]>([6, 7, 13]);
+  const [targetCameraPosition, setTargetCameraPosition] = useState<[number, number, number]>([6, 7, 13]);
 
   const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
   const { size, camera, gl, scene } = useThree();
   const raycaster = useRef(new THREE.Raycaster());
   const mouse = useRef(new THREE.Vector2());
-
-  
 
   // Cache card meshes to avoid scene traversal
   const cardMeshes = useRef<THREE.Mesh[]>([]);
@@ -59,6 +65,7 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
     imageCount,
     images,
     spacing,
+    isAnimating,
   });
 
   // Optimized mouse move handler with cached meshes
@@ -75,24 +82,50 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
   );
 
   // Throttled mouse move to prevent flickering on hover
+  // Move the timeoutId outside to persist between renders
+  const mouseMoveTimeoutId = useRef<NodeJS.Timeout | null>(null);
   const throttledMouseMove = useCallback(
-    (() => {
-      let timeoutId: NodeJS.Timeout | null = null;
-      return (event: MouseEvent) => {
-        if (timeoutId) return;
-        timeoutId = setTimeout(() => {
-          handleMouseMove(event);
-          timeoutId = null;
-        }, 16); // ~60fps
-      };
-    })(),
+    (event: MouseEvent) => {
+      if (mouseMoveTimeoutId.current) return;
+      mouseMoveTimeoutId.current = setTimeout(() => {
+        handleMouseMove(event);
+        mouseMoveTimeoutId.current = null;
+      }, 16); // ~60fps
+    },
     [handleMouseMove]
   );
 
-  // Smooth stack movement with momentum
+  // Main animation loop
   useFrame((_, delta) => {
     const targetOffset = -scrollPosition * spacing;
     setStackOffset((current) => THREE.MathUtils.lerp(current, targetOffset, 0.1));
+
+    // Camera position animation
+    if (isAnimating) {
+      // interpolate camera position
+      const currentPosition = new THREE.Vector3(...cameraPosition);
+      const targetPosition = new THREE.Vector3(...targetCameraPosition);
+      currentPosition.lerp(targetPosition, 0.07);
+      setCameraPosition([currentPosition.x, currentPosition.y, currentPosition.z]);
+
+      // interpolate lookAt position
+      const currentLookAt = new THREE.Vector3(...lookAtValue);
+      const targetLookAt = new THREE.Vector3(0, 0, 0);
+      currentLookAt.lerp(targetLookAt, 0.07);
+      setLookAtValue(currentLookAt);
+
+      // Stop animation when close enough
+      if (currentPosition.distanceTo(targetPosition) < 0.003) {
+        setCameraPosition(targetCameraPosition);
+        // Navigate to pending slug if exists
+        if (pendingSlug) {
+          router.push(`/index/${pendingSlug}`);
+          setPendingSlug(null);
+        } else {
+          setCameraPosition(targetCameraPosition);
+        }
+      }
+    }
 
     // Apply momentum scrolling
     if (!isDragging.current && Math.abs(velocity.current) > 0.001) {
@@ -147,9 +180,6 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
   // Handle touch or mouse end with momentum application
   const handleTouchEnd = useTouchEnd(isDragging, touchVelocity, velocity, gl);
 
-  // Responsive camera adjustment
-  useResponsiveCamera(camera, size);
-
   // Set up event listeners
   useInitEventListeners(handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd, throttledMouseMove);
 
@@ -171,11 +201,26 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
     }
   }, [cards, scrollPosition]);
 
+  function handleAnimationStart(slug: string, cardIndex: number) {
+    setPendingSlug(slug);
+    toggleCameraPosition(cardIndex);
+  }
+
+  function toggleCameraPosition(cardIndex: number) {
+    const basePosition = cameraPosition[2] !== 13;
+    setTargetCameraPosition(basePosition ? [6, 7, 13] : [0, 0, 10]);
+    setAnimatingCardIndex(basePosition ? null : cardIndex);
+    setIsAnimating(true);
+  }
+
+  // Responsive camera adjustment
+  useResponsiveCamera(camera, size, cameraPosition, isAnimating, lookAtValue);
+
   return (
     <>
       <OrthographicCamera
         makeDefault
-        position={[6, 7, 13]}
+        position={cameraPosition}
         near={0.001}
       />
 
@@ -191,17 +236,21 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
           thumbnailUrl={card.thumbnailUrl}
           snippetUrl={card.snippetUrl}
           cardTitle={card.cardTitle}
+          cardOwnerSlug={card.cardOwnerSlug}
           shouldLoadFull={card.shouldLoadFull}
+          isVisible={!isAnimating || animatingCardIndex === card.cardIndex}
           onClick={() => {
-            if (isDragging.current) {
-              return;
-            } else {
-              if (card.cardIndex !== scrollPosition) {
-                setScrollPosition(card.cardIndex);
-              } else {
-                router.push(`/index/${card.cardOwnerSlug}`);
-              }
-            }
+            // if (isDragging.current) {
+            //   return;
+            // } else {
+              handleAnimationStart(card.cardOwnerSlug, card.cardIndex);
+              // if (card.cardIndex !== scrollPosition) {
+              //   setScrollPosition(card.cardIndex);
+              // } else {
+              // router.push(`/index/${card.cardOwnerSlug}`);
+              //   setCameraPosition([0, 0, 5]);
+              // }
+            // }
           }}
         />
       ))}
