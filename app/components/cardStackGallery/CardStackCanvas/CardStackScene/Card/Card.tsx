@@ -18,7 +18,6 @@ export type CardProps = {
   cardTitle: string;
   cardOwnerTitle?: string;
   cardOwnerSlug: string;
-  onClick: () => void;
   shouldLoadFull?: boolean;
   isVisible: boolean;
 };
@@ -35,7 +34,6 @@ export default function Card({
   placeholderUrl,
   shouldLoadFull,
   isVisible,
-  onClick,
 }: CardProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [aspectRatio, setAspectRatio] = useState(1);
@@ -126,7 +124,6 @@ export default function Card({
       ref={meshRef}
       position={[0, 0, 0]}
       scale={[1.2, 1.2, 1]}
-      onClick={() => onClick()}
       userData={{ cardIndex, cardTitle }}
     >
       <boxGeometry args={[cardWidth, cardHeight, 0.035]} />
