@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import * as THREE from "three";
+import { performRaycast } from "../../utils/performRaycast";
 
 export default function useMouseHover(
   isDragging: React.RefObject<boolean>,
@@ -14,41 +15,24 @@ export default function useMouseHover(
 ) {
   return useCallback(
     (event: MouseEvent) => {
-      if (isDragging.current) return;
+      const result = performRaycast({ event, isDragging, raycaster, mouse, camera, scene, gl, cardMeshes });
 
-      const rect = gl.domElement.getBoundingClientRect();
-      mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-      raycaster.current.setFromCamera(mouse.current, camera);
-
-      // Use cached meshes instead of traversing scene
-      if (cardMeshes.current.length === 0) {
-        // Only traverse once to build cache
-        scene.traverse((child: THREE.Object3D) => {
-          if (child instanceof THREE.Mesh && child.userData && child.userData.cardIndex !== undefined) {
-            cardMeshes.current.push(child as THREE.Mesh);
-          }
-        });
-      }
-
-      const intersects = raycaster.current.intersectObjects(cardMeshes.current, false);
+      if (!result) return;
 
       if (hoverTimeout.current) {
         clearTimeout(hoverTimeout.current);
         hoverTimeout.current = null;
       }
 
-      if (intersects.length > 0) {
+      if (result.cardIndex !== null) {
         hoverTimeout.current = setTimeout(() => {
-          const cardIndex = intersects[0].object.userData.cardIndex;
-          setHoveredIndex(cardIndex);
+          setHoveredIndex(result.cardIndex);
           gl.domElement.style.cursor = "pointer";
         }, 7);
       } else {
         hoverTimeout.current = setTimeout(() => {
           setHoveredIndex(null);
-        }, 300);
+        }, 200);
         gl.domElement.style.cursor = "grab";
       }
     },
