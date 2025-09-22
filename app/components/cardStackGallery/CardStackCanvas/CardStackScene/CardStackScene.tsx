@@ -82,7 +82,6 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
   );
 
   // Throttled mouse move to prevent flickering on hover
-  // Move the timeoutId outside to persist between renders
   const mouseMoveTimeoutId = useRef<NodeJS.Timeout | null>(null);
   const throttledMouseMove = useCallback(
     (event: MouseEvent) => {
@@ -240,17 +239,7 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
           shouldLoadFull={card.shouldLoadFull}
           isVisible={!isAnimating || animatingCardIndex === card.cardIndex}
           onClick={() => {
-            // if (isDragging.current) {
-            //   return;
-            // } else {
-              handleAnimationStart(card.cardOwnerSlug, card.cardIndex);
-              // if (card.cardIndex !== scrollPosition) {
-              //   setScrollPosition(card.cardIndex);
-              // } else {
-              // router.push(`/index/${card.cardOwnerSlug}`);
-              //   setCameraPosition([0, 0, 5]);
-              // }
-            // }
+            handleAnimationStart(card.cardOwnerSlug, card.cardIndex);
           }}
         />
       ))}
