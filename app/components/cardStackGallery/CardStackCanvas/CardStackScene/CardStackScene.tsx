@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import Card from "./Card/Card";
+import useClick from "@/app/lib/cardStackGallery/hooks/click/useClick";
 
 export default function CardStackScene({ images }: { images: StackImagesArray }) {
   const router = useRouter();
@@ -79,6 +80,18 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
     setHoveredIndex,
     cardMeshes,
     hoverTimeout
+  );
+  const handleClick = useClick(
+    isDragging,
+    raycaster,
+    mouse,
+    camera,
+    scene,
+    gl,
+    setHoveredIndex,
+    cardMeshes,
+    cards,
+    handleAnimationStart
   );
 
   // Throttled mouse move to prevent flickering on hover
@@ -173,14 +186,15 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
     touchStartX,
     touchVelocity,
     velocity,
-    setScrollPosition
+    setScrollPosition,
+    gl
   );
 
   // Handle touch or mouse end with momentum application
   const handleTouchEnd = useTouchEnd(isDragging, touchVelocity, velocity, gl);
 
   // Set up event listeners
-  useInitEventListeners(handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd, throttledMouseMove);
+  useInitEventListeners(handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd, throttledMouseMove, handleClick);
 
   // Push active card title to context
   useEffect(() => {
@@ -238,9 +252,9 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
           cardOwnerSlug={card.cardOwnerSlug}
           shouldLoadFull={card.shouldLoadFull}
           isVisible={!isAnimating || animatingCardIndex === card.cardIndex}
-          onClick={() => {
-            handleAnimationStart(card.cardOwnerSlug, card.cardIndex);
-          }}
+          // onClick={() => {
+          //   handleAnimationStart(card.cardOwnerSlug, card.cardIndex);
+          // }}
         />
       ))}
 

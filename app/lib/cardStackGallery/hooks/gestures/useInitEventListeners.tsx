@@ -11,7 +11,8 @@ export default function useInitEventListeners(
   handleTouchStart: UseInitEventListenersParams["touchEvent"],
   handleTouchMove: UseInitEventListenersParams["touchEvent"],
   handleTouchEnd: UseInitEventListenersParams["touchEvent"],
-  throttledMouseMove: UseInitEventListenersParams["mouseEvent"]
+  throttledMouseMove: UseInitEventListenersParams["mouseEvent"],
+  handleClick: UseInitEventListenersParams["mouseEvent"]
 ): void {
   useEffect(() => {
     const canvas = document.querySelector("canvas");
@@ -22,6 +23,7 @@ export default function useInitEventListeners(
       canvas.addEventListener("mouseup", handleTouchEnd, { passive: false });
       canvas.addEventListener("mouseleave", handleTouchEnd, { passive: false });
       canvas.addEventListener("mousemove", throttledMouseMove, { passive: false });
+      canvas.addEventListener("click", handleClick, { passive: false });
       canvas.addEventListener("touchstart", handleTouchStart, { passive: false });
       canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
       canvas.addEventListener("touchend", handleTouchEnd, { passive: false });
@@ -33,6 +35,7 @@ export default function useInitEventListeners(
         canvas.removeEventListener("mouseup", handleTouchEnd);
         canvas.removeEventListener("mouseleave", handleTouchEnd);
         canvas.removeEventListener("mousemove", throttledMouseMove);
+        canvas.removeEventListener("click", handleClick);
         canvas.removeEventListener("touchstart", handleTouchStart);
         canvas.removeEventListener("touchmove", handleTouchMove);
         canvas.removeEventListener("touchend", handleTouchEnd);
