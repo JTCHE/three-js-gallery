@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 
 // Create shared fallback texture once
@@ -14,7 +14,15 @@ const createFallbackTexture = (() => {
   };
 })();
 
-export const GradientMaskMaterial = ({ texture, aspectRatio }: { texture?: THREE.Texture; aspectRatio?: number }) => {
+export const GradientMaskMaterial = ({
+  texture,
+  aspectRatio,
+  opacity = 1,
+}: {
+  texture?: THREE.Texture;
+  aspectRatio?: number;
+  opacity?: number;
+}) => {
   const materialRef = useRef<THREE.ShaderMaterial>(null!);
 
   const vertexShader = `
@@ -29,6 +37,7 @@ export const GradientMaskMaterial = ({ texture, aspectRatio }: { texture?: THREE
     uniform sampler2D uTexture;
     uniform float uAspectRatio;
     uniform float uMaskInset;
+    uniform float uOpacity;
     varying vec2 vUv;
 
     // Optimized mask with smoother falloff using pow for better curve
@@ -42,32 +51,44 @@ export const GradientMaskMaterial = ({ texture, aspectRatio }: { texture?: THREE
       vec2 uv = vUv;
       float mask = createMask(uv, 0.15);
       
-      // Ultra-efficient 4-sample blur - works on any GPU
+      vec4 color = texture2D(uTexture, uv) * 4.0; // Center sample weighted more
       float blurAmount = (1.0 - mask) * 0.01;
-      vec4 color = texture2D(uTexture, uv);
-      color += texture2D(uTexture, uv + vec2(blurAmount, 0.0));
-      color += texture2D(uTexture, uv + vec2(-blurAmount, 0.0));
-      color += texture2D(uTexture, uv + vec2(0.0, blurAmount));
-      color += texture2D(uTexture, uv + vec2(0.0, -blurAmount));
       
-      color *= 0.2; // /5 samples
-      color.a = mix(0.8, 1.0, mask);
+      // Optimized 8-sample blur pattern
+      color += texture2D(uTexture, uv + vec2(-blurAmount, -blurAmount));
+      color += texture2D(uTexture, uv + vec2(0.0, -blurAmount));
+      color += texture2D(uTexture, uv + vec2(blurAmount, -blurAmount));
+      color += texture2D(uTexture, uv + vec2(-blurAmount, 0.0));
+      color += texture2D(uTexture, uv + vec2(blurAmount, 0.0));
+      color += texture2D(uTexture, uv + vec2(-blurAmount, blurAmount));
+      color += texture2D(uTexture, uv + vec2(0.0, blurAmount));
+      color += texture2D(uTexture, uv + vec2(blurAmount, blurAmount));
+
+      
+      color /= 12.0; // 4 + 8 samples
+      color.a = mix(0.8, 1.0, mask) * uOpacity;
 
       gl_FragColor = color;
     }
   `;
 
-  const uniforms = {
-    uTexture: { value: texture || createFallbackTexture() },
-    uAspectRatio: { value: aspectRatio },
-    uMaskInset: { value: 0.2 },
-  };
+  const uniforms = useMemo(
+    () => ({
+      uTexture: { value: texture || createFallbackTexture() },
+      uAspectRatio: { value: aspectRatio },
+      uMaskInset: { value: 0.2 },
+      uOpacity: { value: opacity },
+    }),
+    []
+  );
 
   useEffect(() => {
     if (materialRef.current) {
       materialRef.current.uniforms.uTexture.value = texture || createFallbackTexture();
+      materialRef.current.uniforms.uOpacity.value = opacity;
+      materialRef.current.uniforms.uAspectRatio.value = aspectRatio;
     }
-  }, [texture]);
+  }, [texture, opacity, aspectRatio]);
 
   return (
     <shaderMaterial
