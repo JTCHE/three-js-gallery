@@ -2,8 +2,14 @@
 import { useEffect } from "react";
 import * as THREE from "three";
 
-export default function useResponsiveCamera(camera: THREE.Camera, size: { width: number; height: number }) {
-    const viewportAspect = size.width / size.height;
+export default function useResponsiveCamera(
+  camera: THREE.Camera,
+  size: { width: number; height: number },
+  cameraPosition: [number, number, number],
+  isAnimating: boolean,
+  lookAtValue = new THREE.Vector3(0, 0.5, 0)
+) {
+  const viewportAspect = size.width / size.height;
 
   useEffect(() => {
     if (!camera || !THREE.OrthographicCamera.prototype.isPrototypeOf(camera)) return;
@@ -27,6 +33,6 @@ export default function useResponsiveCamera(camera: THREE.Camera, size: { width:
     }
 
     threeOrthographicCamera.updateProjectionMatrix();
-    threeOrthographicCamera.lookAt(0, 0.5, 0);
-  }, [size, viewportAspect, camera]);
+    threeOrthographicCamera.lookAt(lookAtValue);
+  }, [size, viewportAspect, camera, cameraPosition, isAnimating, lookAtValue]);
 }
