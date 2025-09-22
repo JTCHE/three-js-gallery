@@ -20,7 +20,6 @@ import useClick from "@/app/lib/cardStackGallery/hooks/click/useClick";
 export default function CardStackScene({ images }: { images: StackImagesArray }) {
   const router = useRouter();
 
-  const imageCount = images.length;
   const spacing = 2.5;
 
   const [scrollPosition, setScrollPosition] = useState(0);
@@ -63,7 +62,6 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
   const cards = useMemoizeCards({
     scrollPosition,
     hoveredIndex,
-    imageCount,
     images,
     spacing,
     isAnimating,
@@ -81,18 +79,7 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
     cardMeshes,
     hoverTimeout
   );
-  const handleClick = useClick(
-    isDragging,
-    raycaster,
-    mouse,
-    camera,
-    scene,
-    gl,
-    setHoveredIndex,
-    cardMeshes,
-    cards,
-    handleAnimationStart
-  );
+  const handleClick = useClick(isDragging, raycaster, mouse, camera, scene, gl, cardMeshes, cards, handleAnimationStart);
 
   // Throttled mouse move to prevent flickering on hover
   const mouseMoveTimeoutId = useRef<NodeJS.Timeout | null>(null);
@@ -194,7 +181,15 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
   const handleTouchEnd = useTouchEnd(isDragging, touchVelocity, velocity, gl);
 
   // Set up event listeners
-  useInitEventListeners(handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd, throttledMouseMove, handleClick);
+  useInitEventListeners(
+    handleWheel,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
+    throttledMouseMove,
+    handleClick,
+    isAnimating
+  );
 
   // Push active card title to context
   useEffect(() => {
@@ -220,6 +215,16 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
   }
 
   function toggleCameraPosition(cardIndex: number) {
+    // Ensure scrollPosition matches cardIndex before animating
+    setTimeout(() => {
+      setScrollPosition((current) => {
+        if (current !== cardIndex) {
+          return cardIndex;
+        }
+        return current;
+      });
+    }, 100);
+
     const basePosition = cameraPosition[2] !== 13;
     setTargetCameraPosition(basePosition ? [6, 7, 13] : [0, 0, 10]);
     setAnimatingCardIndex(basePosition ? null : cardIndex);
@@ -252,9 +257,6 @@ export default function CardStackScene({ images }: { images: StackImagesArray })
           cardOwnerSlug={card.cardOwnerSlug}
           shouldLoadFull={card.shouldLoadFull}
           isVisible={!isAnimating || animatingCardIndex === card.cardIndex}
-          // onClick={() => {
-          //   handleAnimationStart(card.cardOwnerSlug, card.cardIndex);
-          // }}
         />
       ))}
 
